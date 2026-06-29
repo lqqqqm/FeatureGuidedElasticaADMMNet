@@ -28,6 +28,44 @@ class OptionalLPIPS:
         return self.model(pred, target).mean()
 
 
+class FrechetInceptionDistance:
+    """Lazy wrapper around TorchMetrics' standard Inception-v3 FID metric.
+
+    Images in this project use the [-1, 1] range.  TorchMetrics receives the
+    corresponding [0, 1] floating-point tensors via ``normalize=True``.
+    """
+
+    def __init__(self, device: torch.device):
+        try:
+            from torchmetrics.image.fid import FrechetInceptionDistance as TorchMetricsFID
+        except Exception as exc:
+            raise RuntimeError(
+                "FID requires the optional dependency 'torchmetrics[image]'. "
+                "Install requirements_optional.txt before setting eval.compute_fid=true."
+            ) from exc
+
+        try:
+            self.metric = TorchMetricsFID(feature=2048, normalize=True).to(device)
+        except Exception as exc:
+            raise RuntimeError(
+                "Could not initialize the Inception-v3 FID metric. Ensure its pretrained weights "
+                "are cached or allow Kaggle Internet access for the first run."
+            ) from exc
+
+    @staticmethod
+    def _to_unit_range(x: torch.Tensor) -> torch.Tensor:
+        return ((x.detach().float() + 1.0) * 0.5).clamp(0.0, 1.0)
+
+    @torch.no_grad()
+    def update(self, generated: torch.Tensor, real: torch.Tensor) -> None:
+        self.metric.update(self._to_unit_range(real), real=True)
+        self.metric.update(self._to_unit_range(generated), real=False)
+
+    @torch.no_grad()
+    def compute(self) -> float:
+        return float(self.metric.compute())
+
+
 
 def composite_hole(pred: torch.Tensor, gt: torch.Tensor, M: torch.Tensor) -> torch.Tensor:
     M3 = M.repeat(1, 3, 1, 1)

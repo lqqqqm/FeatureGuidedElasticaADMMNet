@@ -92,6 +92,8 @@ optim:
 eval:
   max_batches: null
   compute_lpips: true
+  compute_fid: false
+  fid_during_train: false
 
 monitor:
   metric: psnr_hole

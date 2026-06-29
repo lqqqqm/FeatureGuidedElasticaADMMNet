@@ -71,6 +71,10 @@ pip install -r requirements.txt
 pip install -r requirements_optional.txt
 ```
 
+When using the Kaggle VGG+FID configuration, this optional installation is
+required. Enable Kaggle Internet for the first run (or attach cached VGG19 and
+Inception weights).
+
 ## 4. 快速自检
 
 ```bash
@@ -96,6 +100,15 @@ python train.py --config configs/full.yaml
 ```bash
 python evaluate.py --config configs/mvp.yaml --checkpoint outputs/fg_elastica_mvp/best.pt --split test
 ```
+
+`ssim` and `ssim_hole` are reported automatically. Set `eval.compute_fid: true`
+to additionally report FID on the complete evaluation split. The Kaggle
+VGG+FID configuration enables this for `evaluate.py` but deliberately keeps
+`eval.fid_during_train: false`, because FID is costly and is most useful for
+the final checkpoint comparison.
+
+For compact Kaggle Version logs, set `logging.progress_bar: false`. Progress
+bars remain enabled by default only in interactive terminals.
 
 ## 7. 单图推理
 

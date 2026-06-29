@@ -1,4 +1,4 @@
-run_name: fg_elastica_kaggle_9k_mvp
+run_name: fg_elastica_kaggle_9k_mvp_vgg_fid
 seed: 42
 output_dir: /kaggle/working/outputs
 data:
@@ -77,13 +77,13 @@ stage_hyper:
   lambda_max: 10.0
 loss:
   lambda_rec: 1.0
-  lambda_perc: 0.0
+  lambda_perc: 0.1
   lambda_edge: 1.0
   lambda_stage: 0.5
   hole_weight: 6.0
   edge_hole_only: true
-  use_perceptual: false
-  vgg_pretrained: false
+  use_perceptual: true
+  vgg_pretrained: true
   stage_weights:
   - 0.1
   - 0.2
@@ -106,6 +106,12 @@ optim:
 eval:
   max_batches: null
   compute_lpips: false
+  # FID is calculated by evaluate.py on the full split, not during each epoch.
+  compute_fid: true
+  fid_during_train: false
+logging:
+  # Kaggle Version logs append every tqdm refresh instead of rewriting one line.
+  progress_bar: false
 monitor:
   metric: psnr_hole
   mode: max

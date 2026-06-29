@@ -139,6 +139,9 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
     max_batches = cfg.get("eval", {}).get("max_batches")
     first_saved = False
 
+
+    
+
     pbar = tqdm(loader, desc=f"{split} {epoch}", leave=False)
     for batch_idx, batch in enumerate(pbar, start=1):
         batch = move_batch_to_device(batch, device)

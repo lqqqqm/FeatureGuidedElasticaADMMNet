@@ -1,2 +1,3 @@
 torchvision>=0.16.0
 lpips>=0.1.4
+torchmetrics[image]>=1.3.0

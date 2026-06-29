@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import torch
@@ -11,10 +12,15 @@ from fg_elastica_inpaint.data.dataset import build_dataloaders
 from fg_elastica_inpaint.losses import InpaintingLoss
 from fg_elastica_inpaint.models import FeatureGuidedElasticaADMMNet
 from fg_elastica_inpaint.utils.config import load_config
-from fg_elastica_inpaint.utils.metrics import OptionalLPIPS, evaluate_batch
+from fg_elastica_inpaint.utils.metrics import FrechetInceptionDistance, OptionalLPIPS, composite_hole, evaluate_batch
 from fg_elastica_inpaint.utils.misc import AverageMeter
 
 LOSS_KEYS = ["total", "rec", "edge", "perc", "stage", "p_cons", "n_m", "struct"]
+
+
+def progress_bar_enabled(cfg: dict) -> bool:
+    """Use progress bars only in interactive terminals to avoid noisy batch logs."""
+    return bool(cfg.get("logging", {}).get("progress_bar", sys.stderr.isatty()))
 
 
 @torch.no_grad()
@@ -72,8 +78,9 @@ def main():
     ]
     metric_meters = {name: AverageMeter() for name in metric_keys}
     lpips_metric = OptionalLPIPS(device) if cfg.get("eval", {}).get("compute_lpips", True) else None
+    fid_metric = FrechetInceptionDistance(device) if cfg.get("eval", {}).get("compute_fid", False) else None
 
-    for batch in tqdm(loader, desc=f"evaluate:{args.split}"):
+    for batch in tqdm(loader, desc=f"evaluate:{args.split}", disable=not progress_bar_enabled(cfg)):
         gt = batch["gt"].to(device)
         M = batch["mask"].to(device)
         I_m = batch["masked"].to(device)
@@ -86,9 +93,13 @@ def main():
         metrics = evaluate_batch(pred, gt, M, lpips_metric)
         for name, value in metrics.items():
             metric_meters[name].update(value, bs)
+        if fid_metric is not None:
+            fid_metric.update(composite_hole(pred, gt, M), gt)
 
     results = {name: meter.avg for name, meter in loss_meters.items()}
     results.update({name: meter.avg for name, meter in metric_meters.items() if meter.count > 0})
+    if fid_metric is not None:
+        results["fid"] = fid_metric.compute()
     print(json.dumps(results, indent=2, ensure_ascii=False))
 
     out_dir = Path(args.checkpoint).resolve().parent
