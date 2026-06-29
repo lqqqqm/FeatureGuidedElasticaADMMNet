@@ -1,0 +1,114 @@
+run_name: fg_elastica_kaggle_9k_mvp
+seed: 42
+output_dir: /kaggle/working/outputs
+data:
+  train_list: /kaggle/working/data_splits/train.txt
+  val_list: /kaggle/working/data_splits/val.txt
+  test_list: /kaggle/working/data_splits/test.txt
+  val_mask_list: /kaggle/working/fixed_masks/val_masks.txt
+  test_mask_list: /kaggle/working/fixed_masks/test_masks.txt
+  image_size: 256
+  resize_short_to: 286
+  batch_size: 4
+  val_batch_size: 4
+  test_batch_size: 4
+  num_workers: 2
+  hole_buckets:
+  - - 0.1
+    - 0.2
+  - - 0.2
+    - 0.3
+  - - 0.3
+    - 0.45
+  - - 0.45
+    - 0.6
+  bucket_probs:
+  - 0.2
+  - 0.2
+  - 0.25
+  - 0.35
+  mask_topology_modes:
+  - thin_distributed
+  - scattered_irregular
+  - large_contiguous
+  - mixed
+  mask_topology_probs:
+  - 0.3
+  - 0.3
+  - 0.25
+  - 0.15
+  train_limit: null
+  val_limit: null
+  test_limit: null
+model:
+  K: 3
+  transformer_depth: 2
+  transformer_heads: 8
+  transformer_mlp_ratio: 4.0
+  transformer_dropout: 0.0
+  enable_p_correction: false
+  enable_n_correction: false
+  use_softplus_alpha: true
+  use_bounded_alpha: true
+  alpha_u_init: 0.1
+  alpha_p_init: 0.0
+  alpha_n_init: 0.0
+  alpha_u_scale: 0.1
+  alpha_p_scale: 0.05
+  alpha_n_scale: 0.05
+  use_adaptive_beta: false
+  use_adaptive_mu: false
+  use_structure_head: false
+  structure_gamma: 0.0
+stage_hyper:
+  r1: 1.0
+  r2: 2.0
+  r4: 1.0
+  eta: 10.0
+  mu0: 0.2
+  beta_p: 0.1
+  gamma_p: 0.5
+  gamma_n: 0.5
+  Tu: 3
+  Tn: 3
+  tau_u: 0.05
+  tau_n: 0.125
+  eps: 1.0e-06
+  lambda_max: 10.0
+loss:
+  lambda_rec: 1.0
+  lambda_perc: 0.0
+  lambda_edge: 1.0
+  lambda_stage: 0.5
+  hole_weight: 6.0
+  edge_hole_only: true
+  use_perceptual: false
+  vgg_pretrained: false
+  stage_weights:
+  - 0.1
+  - 0.2
+  - 0.3
+  lambda_p_cons: 0.0
+  lambda_n_m: 0.0
+  lambda_struct: 0.0
+optim:
+  lr: 0.0001
+  betas:
+  - 0.9
+  - 0.999
+  weight_decay: 0.0001
+  epochs: 20
+  warmup_steps: 5000
+  min_lr_ratio: 0.05
+  grad_clip: 1.0
+  amp: true
+  save_every: 5
+eval:
+  max_batches: null
+  compute_lpips: false
+monitor:
+  metric: psnr_hole
+  mode: max
+  patience: 5
+  min_delta: 0.01
+  warmup_epochs: 2
