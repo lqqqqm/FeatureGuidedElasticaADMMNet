@@ -137,10 +137,6 @@ def psnr(mse: torch.Tensor) -> float:
     return float((-10.0 * torch.log10(mse.clamp_min(1e-10))).item())
 
 
-def masked_mean(values: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-    return (values * mask).sum() / (mask.sum() * values.shape[1]).clamp_min(1.0)
-
-
 def gaussian_window(channels: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
     coords = torch.arange(11, device=device, dtype=dtype) - 5.0
     kernel_1d = torch.exp(-(coords.square()) / (2.0 * 1.5**2))
@@ -165,22 +161,18 @@ def ssim_global(pred: torch.Tensor, gt: torch.Tensor) -> float:
 
 
 def compute_metrics(pred: torch.Tensor, gt: torch.Tensor, known_mask: torch.Tensor) -> dict[str, float]:
-    pred_01 = ((pred.clamp(-1.0, 1.0) + 1.0) * 0.5).float()
+    completed = pred * (1.0 - known_mask) + gt * known_mask
+    pred_01 = ((completed.clamp(-1.0, 1.0) + 1.0) * 0.5).float()
     gt_01 = ((gt.clamp(-1.0, 1.0) + 1.0) * 0.5).float()
     error = pred_01 - gt_01
     squared_error = error.square()
     absolute_error = error.abs()
-    hole_mask = 1.0 - known_mask
-    mse_global = squared_error.mean()
-    mse_hole = masked_mean(squared_error, hole_mask)
+    mse = squared_error.mean()
     return {
-        "mse_global": float(mse_global.item()),
-        "mae_global": float(absolute_error.mean().item()),
-        "psnr_global": psnr(mse_global),
-        "ssim_global": ssim_global(pred, gt),
-        "mse_hole": float(mse_hole.item()),
-        "mae_hole": float(masked_mean(absolute_error, hole_mask).item()),
-        "psnr_hole": psnr(mse_hole),
+        "mse": float(mse.item()),
+        "mae": float(absolute_error.mean().item()),
+        "psnr": psnr(mse),
+        "ssim": ssim_global(completed, gt),
     }
 
 
@@ -257,7 +249,7 @@ def summarize(rows: list[dict[str, float | str]]) -> list[dict[str, float | str]
     for row in rows:
         grouped[(str(row["hole_level"]), str(row["output_type"]))].append(row)
     summary = []
-    metrics = [key for key in rows[0] if key.endswith(("_global", "_hole"))]
+    metrics = [key for key in ("mse", "mae", "psnr", "ssim") if key in rows[0]]
     for (hole_level, output_type), values in grouped.items():
         item: dict[str, float | str] = {
             "hole_level": hole_level,

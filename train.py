@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import time
 from pathlib import Path
 from typing import Dict, Optional
@@ -14,11 +15,22 @@ from fg_elastica_inpaint.losses import InpaintingLoss
 from fg_elastica_inpaint.models import FeatureGuidedElasticaADMMNet
 from fg_elastica_inpaint.utils.config import load_config, save_config
 from fg_elastica_inpaint.utils.image import save_triplet
-from fg_elastica_inpaint.utils.metrics import OptionalLPIPS, evaluate_batch
+from fg_elastica_inpaint.utils.metrics import (
+    MASK_RATIO_BUCKETS,
+    FrechetInceptionDistance,
+    OptionalLPIPS,
+    composite_completed,
+    evaluate_per_image,
+    mask_ratio_bucket,
+    summarize_bucket_metrics,
+    summarize_metric_items,
+    validation_sanity,
+)
 from fg_elastica_inpaint.utils.misc import AverageMeter, append_csv_row, count_parameters, save_checkpoint, set_seed
 from fg_elastica_inpaint.utils.scheduler import build_warmup_cosine_scheduler
 
 LOSS_KEYS = ["total", "rec", "edge", "perc", "stage", "p_cons", "n_m", "struct"]
+HOLE_METRIC_COLUMNS = {"psnr_hole", "ssim_hole", "lpips_hole", "edge_f1_hole", "gradient_l1_hole"}
 
 
 def _format_stats(stats: Optional[Dict], keys) -> str:
@@ -31,11 +43,26 @@ def _format_stats(stats: Optional[Dict], keys) -> str:
     return ", ".join(parts) if parts else "n/a"
 
 
+def _remove_hole_metric_columns(path: Path) -> None:
+    if not path.exists():
+        return
+    with path.open("r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        fieldnames = [name for name in (reader.fieldnames or []) if name not in HOLE_METRIC_COLUMNS and not name.endswith("_hole")]
+        rows = [{key: value for key, value in row.items() if key in fieldnames} for row in reader]
+    with path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def build_monitor(cfg: Dict, has_val: bool) -> Dict[str, object]:
     monitor_cfg = cfg.get("monitor", {})
     metric = monitor_cfg.get("metric")
     if metric is None:
-        metric = "psnr_hole" if has_val else "total"
+        metric = "psnr" if has_val else "total"
+    if metric == "psnr_hole":
+        metric = "psnr"
 
     mode = monitor_cfg.get("mode")
     if mode is None:
@@ -125,22 +152,30 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
     loss_meters = {name: AverageMeter() for name in LOSS_KEYS}
     metric_keys = [
         "psnr",
-        "psnr_hole",
         "ssim",
-        "ssim_hole",
+        "l1",
         "edge_f1",
         "gradient_l1",
         "boundary_consistency",
         "lpips",
-        "lpips_hole",
     ]
     metric_meters = {name: AverageMeter() for name in metric_keys}
     lpips_metric = OptionalLPIPS(device) if cfg.get("eval", {}).get("compute_lpips", True) else None
+    fid_metric = (
+        FrechetInceptionDistance(device)
+        if cfg.get("eval", {}).get("compute_fid", False) and cfg.get("eval", {}).get("fid_during_train", False)
+        else None
+    )
+    fid_bucket_metrics = (
+        {bucket: FrechetInceptionDistance(device) for bucket, _, _ in MASK_RATIO_BUCKETS}
+        if fid_metric is not None
+        else {}
+    )
     max_batches = cfg.get("eval", {}).get("max_batches")
     first_saved = False
-
-
-    
+    per_image_items = []
+    completed_min = float("inf")
+    completed_max = float("-inf")
 
     pbar = tqdm(loader, desc=f"{split} {epoch}", leave=False)
     for batch_idx, batch in enumerate(pbar, start=1):
@@ -153,10 +188,20 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
         bs = gt.shape[0]
         for name, meter in loss_meters.items():
             meter.update(float(loss_dict[name].detach()), bs)
-        metrics = evaluate_batch(pred, gt, M, lpips_metric)
+        batch_items = evaluate_per_image(pred, gt, M, lpips_metric)
+        metrics = summarize_metric_items(batch_items)
+        per_image_items.extend(batch_items)
         for name, value in metrics.items():
             metric_meters[name].update(value, bs)
-        show_keys = ["psnr_hole", "ssim_hole"]
+        completed = composite_completed(pred, gt, M)
+        completed_min = min(completed_min, float(completed.min().detach()))
+        completed_max = max(completed_max, float(completed.max().detach()))
+        if fid_metric is not None:
+            fid_metric.update(completed, gt)
+            for sample_idx, item in enumerate(batch_items):
+                bucket = mask_ratio_bucket(float(item["hole_ratio"]))
+                fid_bucket_metrics[bucket].update(completed[sample_idx : sample_idx + 1], gt[sample_idx : sample_idx + 1])
+        show_keys = ["psnr", "ssim"]
         pbar.set_postfix({k: f"{metric_meters[k].avg:.3f}" for k in show_keys if metric_meters[k].count > 0})
 
         if not first_saved:
@@ -171,6 +216,25 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
     for name, meter in metric_meters.items():
         if meter.count > 0:
             row[name] = meter.avg
+    if fid_metric is not None:
+        try:
+            row["fid"] = fid_metric.compute()
+        except Exception as exc:
+            row["fid"] = float("nan")
+            print(f"[Sanity:{split}] WARNING: FID failed: {exc}")
+    bucket_rows = summarize_bucket_metrics(per_image_items)
+    _remove_hole_metric_columns(out_dir / "bucket_metrics.csv")
+    for bucket_row in bucket_rows:
+        if fid_bucket_metrics and int(bucket_row["num_samples"]) > 0:
+            try:
+                bucket_row["fid"] = fid_bucket_metrics[str(bucket_row["bucket"])].compute()
+            except Exception as exc:
+                bucket_row["fid"] = float("nan")
+                print(f"[Sanity:{split}] WARNING: bucket {bucket_row['bucket']} FID failed: {exc}")
+        bucket_row = {"epoch": epoch, "split": split, **bucket_row}
+        append_csv_row(out_dir / "bucket_metrics.csv", bucket_row)
+    for line in validation_sanity(per_image_items, completed_min, completed_max):
+        print(f"[Sanity:{split}] {line}")
     row.pop("epoch")
     row.pop("split")
     return row
@@ -290,6 +354,7 @@ def main():
             save_checkpoint(state, out_dir / f"epoch_{epoch:04d}.pt")
 
         current_lr = optimizer.param_groups[0]["lr"]
+        _remove_hole_metric_columns(out_dir / "log.csv")
         train_row = dict(train_stats)
         train_row.update(
             {
@@ -327,7 +392,7 @@ def main():
             f"train: {_format_stats(train_stats, ['total', 'rec', 'edge', 'stage'])}"
         )
         if val_stats is not None:
-            print(f"[Epoch {epoch:03d}/{epochs:03d}] val:   {_format_stats(val_stats, ['total', 'psnr_hole', 'ssim_hole', 'lpips_hole'])}")
+            print(f"[Epoch {epoch:03d}/{epochs:03d}] val:   {_format_stats(val_stats, ['total', 'psnr', 'ssim', 'lpips', 'fid'])}")
 
         if improved:
             prev = "None" if best_before is None else f"{best_before:.4f}"

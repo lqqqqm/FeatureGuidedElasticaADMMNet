@@ -101,8 +101,9 @@ python train.py --config configs/full.yaml
 python evaluate.py --config configs/mvp.yaml --checkpoint outputs/fg_elastica_mvp/best.pt --split test
 ```
 
-`ssim` and `ssim_hole` are reported automatically. Set `eval.compute_fid: true`
-to additionally report FID on the complete evaluation split. The Kaggle
+Completed-image PSNR, SSIM, L1, Edge-F1, Gradient-L1, Boundary Consistency,
+and LPIPS are reported automatically. Set `eval.compute_fid: true`
+to additionally report FID on the complete evaluation split and mask-ratio buckets. The Kaggle
 VGG+FID configuration enables this for `evaluate.py` but deliberately keeps
 `eval.fid_during_train: false`, because FID is costly and is most useful for
 the final checkpoint comparison.

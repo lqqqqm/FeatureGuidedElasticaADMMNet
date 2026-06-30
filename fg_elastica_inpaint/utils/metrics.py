@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+import math
+from typing import Dict, Iterable, List, Optional
 
 import torch
 import torch.nn.functional as F
@@ -67,9 +68,26 @@ class FrechetInceptionDistance:
 
 
 
+MASK_RATIO_BUCKETS = [
+    ("0-10%", 0.0, 0.1),
+    ("10-20%", 0.1, 0.2),
+    ("20-30%", 0.2, 0.3),
+    ("30-40%", 0.3, 0.4),
+    ("40-50%", 0.4, 0.5),
+    ("50-60%", 0.5, 0.6),
+    ("60%+", 0.6, 1.0 + 1e-6),
+]
+
+
+def composite_completed(pred: torch.Tensor, gt: torch.Tensor, known_mask: torch.Tensor) -> torch.Tensor:
+    known_mask3 = known_mask.repeat(1, pred.shape[1], 1, 1)
+    hole_mask3 = 1.0 - known_mask3
+    return hole_mask3 * pred + known_mask3 * gt
+
+
 def composite_hole(pred: torch.Tensor, gt: torch.Tensor, M: torch.Tensor) -> torch.Tensor:
-    M3 = M.repeat(1, 3, 1, 1)
-    return (1.0 - M3) * pred + M3 * gt
+    """Backward-compatible alias. M=1 is known, M=0 is hole."""
+    return composite_completed(pred, gt, M)
 
 
 
@@ -77,12 +95,6 @@ def psnr(pred: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
     mse = F.mse_loss(pred, gt)
     return 10.0 * torch.log10(4.0 / mse.clamp_min(1e-8))
 
-
-
-def psnr_hole(pred: torch.Tensor, gt: torch.Tensor, M: torch.Tensor) -> torch.Tensor:
-    hole = (1.0 - M).repeat(1, 3, 1, 1)
-    mse = ((pred - gt).pow(2) * hole).sum() / hole.sum().clamp_min(1.0)
-    return 10.0 * torch.log10(4.0 / mse.clamp_min(1e-8))
 
 
 def gradient_l1(pred: torch.Tensor, gt: torch.Tensor, M: torch.Tensor | None = None) -> torch.Tensor:
@@ -113,8 +125,9 @@ def edge_f1(pred: torch.Tensor, gt: torch.Tensor, M: torch.Tensor | None = None)
 
 
 def boundary_consistency(pred: torch.Tensor, gt: torch.Tensor, M: torch.Tensor) -> torch.Tensor:
-    hole = 1.0 - M
-    boundary = F.max_pool2d(hole, kernel_size=3, stride=1, padding=1) - hole
+    hole_mask = 1.0 - M
+    eroded_hole = -F.max_pool2d(-hole_mask, kernel_size=5, stride=1, padding=2)
+    boundary = (hole_mask - eroded_hole).clamp(0.0, 1.0)
     boundary3 = boundary.repeat(1, pred.shape[1], 1, 1)
     return ((pred - gt).abs() * boundary3).sum() / boundary3.sum().clamp_min(1.0)
 
@@ -169,31 +182,99 @@ def evaluate_per_image(
     lpips_metric: OptionalLPIPS | None = None,
 ) -> List[Dict[str, float]]:
     results: List[Dict[str, float]] = []
-    comp = composite_hole(pred, gt, M)
+    completed = composite_completed(pred, gt, M)
     batch_size = pred.shape[0]
     for idx in range(batch_size):
-        pred_i = pred[idx : idx + 1]
         gt_i = gt[idx : idx + 1]
-        mask_i = M[idx : idx + 1]
-        comp_i = comp[idx : idx + 1]
+        known_mask_i = M[idx : idx + 1]
+        completed_i = completed[idx : idx + 1]
 
         item: Dict[str, float] = {
             "index": float(idx),
-            "hole_ratio": float((1.0 - mask_i).mean()),
-            "psnr": float(psnr(pred_i, gt_i)),
-            "psnr_hole": float(psnr_hole(pred_i, gt_i, mask_i)),
-            "ssim": float(ssim(pred_i, gt_i)),
-            "ssim_hole": float(ssim(comp_i, gt_i)),
-            "edge_f1": float(edge_f1(pred_i, gt_i, mask_i)),
-            "gradient_l1": float(gradient_l1(pred_i, gt_i, mask_i)),
-            "boundary_consistency": float(boundary_consistency(pred_i, gt_i, mask_i)),
+            "hole_ratio": float((1.0 - known_mask_i).mean()),
+            "psnr": float(psnr(completed_i, gt_i)),
+            "ssim": float(ssim(completed_i, gt_i)),
+            "l1": float(F.l1_loss(completed_i, gt_i)),
+            "edge_f1": float(edge_f1(completed_i, gt_i)),
+            "gradient_l1": float(gradient_l1(completed_i, gt_i)),
+            "boundary_consistency": float(boundary_consistency(completed_i, gt_i, known_mask_i)),
         }
         if lpips_metric is not None:
-            lpips_whole = lpips_metric(pred_i, gt_i)
-            lpips_h = lpips_metric(comp_i, gt_i)
+            lpips_whole = lpips_metric(completed_i, gt_i)
             if lpips_whole is not None:
                 item["lpips"] = float(lpips_whole)
-            if lpips_h is not None:
-                item["lpips_hole"] = float(lpips_h)
         results.append(item)
     return results
+
+
+def mask_ratio_bucket(mask_ratio: float) -> str:
+    for name, low, high in MASK_RATIO_BUCKETS:
+        if low <= mask_ratio < high:
+            return name
+    return "60%+"
+
+
+def metric_names_from_items(items: Iterable[Dict[str, float]]) -> List[str]:
+    names: List[str] = []
+    for item in items:
+        for key in item:
+            if key in {"index", "hole_ratio"} or key in names:
+                continue
+            names.append(key)
+    return names
+
+
+def summarize_metric_items(items: List[Dict[str, float]]) -> Dict[str, float]:
+    summary: Dict[str, float] = {}
+    for name in metric_names_from_items(items):
+        values = [float(item[name]) for item in items if name in item and math.isfinite(float(item[name]))]
+        if values:
+            summary[name] = sum(values) / len(values)
+    return summary
+
+
+def summarize_bucket_metrics(items: List[Dict[str, float]]) -> List[Dict[str, float | str]]:
+    metric_names = metric_names_from_items(items)
+    rows: List[Dict[str, float | str]] = []
+    for bucket, _, _ in MASK_RATIO_BUCKETS:
+        bucket_items = [item for item in items if mask_ratio_bucket(float(item["hole_ratio"])) == bucket]
+        row: Dict[str, float | str] = {
+            "bucket": bucket,
+            "num_samples": len(bucket_items),
+            "avg_mask_ratio": float("nan"),
+        }
+        if bucket_items:
+            row["avg_mask_ratio"] = sum(float(item["hole_ratio"]) for item in bucket_items) / len(bucket_items)
+        for name in metric_names:
+            values = [float(item[name]) for item in bucket_items if name in item and math.isfinite(float(item[name]))]
+            row[name] = sum(values) / len(values) if values else float("nan")
+        rows.append(row)
+    return rows
+
+
+def validation_sanity(
+    items: List[Dict[str, float]],
+    completed_min: float,
+    completed_max: float,
+    min_bucket_samples: int = 5,
+) -> List[str]:
+    if not items:
+        return ["No evaluation samples were processed."]
+    lines = []
+    avg_mask_ratio = sum(float(item["hole_ratio"]) for item in items) / len(items)
+    lines.append(f"Average mask ratio: {avg_mask_ratio:.4f}")
+    lines.append(f"Completed image range: min={completed_min:.4f}, max={completed_max:.4f}")
+    for row in summarize_bucket_metrics(items):
+        count = int(row["num_samples"])
+        lines.append(f"Bucket {row['bucket']}: {count} sample(s)")
+        if 0 < count < min_bucket_samples:
+            lines.append(f"WARNING: bucket {row['bucket']} has only {count} sample(s); metrics may be unstable.")
+    for metric_name in ["psnr", "ssim", "lpips"]:
+        bad_count = sum(
+            1
+            for item in items
+            if metric_name in item and not math.isfinite(float(item[metric_name]))
+        )
+        if bad_count:
+            lines.append(f"WARNING: {metric_name} produced {bad_count} non-finite value(s).")
+    return lines

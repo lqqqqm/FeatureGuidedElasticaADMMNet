@@ -86,19 +86,17 @@ def main() -> None:
                     "variant": variant,
                     "hole_ratio": float(1.0 - mask.mean().cpu()),
                     "psnr": metrics["psnr"],
-                    "psnr_hole": metrics["psnr_hole"],
                     "ssim": metrics["ssim"],
-                    "ssim_hole": metrics["ssim_hole"],
                 }
                 rows.append(row)
                 print(
                     f"{benchmark} | {image_path.name} | {variant} | "
-                    f"hole={row['hole_ratio']:.1%} | PSNR-hole={row['psnr_hole']:.2f} | "
-                    f"SSIM-hole={row['ssim_hole']:.4f}"
+                    f"hole={row['hole_ratio']:.1%} | PSNR={row['psnr']:.2f} | "
+                    f"SSIM={row['ssim']:.4f}"
                 )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    fields = ["benchmark", "image", "variant", "hole_ratio", "psnr", "psnr_hole", "ssim", "ssim_hole"]
+    fields = ["benchmark", "image", "variant", "hole_ratio", "psnr", "ssim"]
     with (OUTPUT_DIR / "metrics.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()

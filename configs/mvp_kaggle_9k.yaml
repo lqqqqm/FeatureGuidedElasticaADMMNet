@@ -105,15 +105,14 @@ optim:
   save_every: 5
 eval:
   max_batches: null
-  compute_lpips: false
-  # FID is calculated by evaluate.py on the full split, not during each epoch.
+  compute_lpips: true
   compute_fid: true
-  fid_during_train: false
+  fid_during_train: true
 logging:
   # Kaggle Version logs append every tqdm refresh instead of rewriting one line.
   progress_bar: false
 monitor:
-  metric: psnr_hole
+  metric: psnr
   mode: max
   patience: 5
   min_delta: 0.01

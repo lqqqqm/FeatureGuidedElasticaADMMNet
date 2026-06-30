@@ -95,11 +95,11 @@ optim:
 eval:
   max_batches: null
   compute_lpips: true
-  compute_fid: false
-  fid_during_train: false
+  compute_fid: true
+  fid_during_train: true
 
 monitor:
-  metric: psnr_hole
+  metric: psnr
   mode: max
   patience: 12
   min_delta: 0.01
