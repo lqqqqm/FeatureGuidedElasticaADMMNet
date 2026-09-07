@@ -25,6 +25,7 @@ dist/
 
 # Training outputs, checkpoints, and experiment artifacts
 output/
+outputs/
 runs/
 wandb/
 checkpoints/
@@ -45,4 +46,4 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-.zip
+*.zip
