@@ -34,10 +34,7 @@ class FeatureGuidedElasticaADMMNet(nn.Module):
         alpha_u_scale: float = 0.10,
         alpha_p_scale: float = 0.05,
         alpha_n_scale: float = 0.05,
-        use_adaptive_beta: bool = False,
-        use_adaptive_mu: bool = False,
         use_structure_head: bool = False,
-        structure_gamma: float = 0.0,
         stage_hyper: StageHyperParams | None = None,
     ):
         super().__init__()
@@ -66,10 +63,7 @@ class FeatureGuidedElasticaADMMNet(nn.Module):
             enable_p_correction=enable_p_correction,
             enable_n_correction=enable_n_correction,
             use_unrolling=use_unrolling,
-            use_adaptive_beta=use_adaptive_beta,
-            use_adaptive_mu=use_adaptive_mu,
             use_structure_head=use_structure_head,
-            structure_gamma=structure_gamma,
         )
 
         self.alpha_u = nn.Parameter(torch.full((K,), self._init_alpha_raw(alpha_u_init, alpha_u_scale)))
@@ -163,16 +157,13 @@ class FeatureGuidedElasticaADMMNet(nn.Module):
             r2=stage_cfg.get("r2", 2.0),
             r4=stage_cfg.get("r4", 1.0),
             eta=stage_cfg.get("eta", 10.0),
-            mu0=stage_cfg.get("mu0", 0.2),
-            beta_p=stage_cfg.get("beta_p", 0.1),
-            gamma_p=stage_cfg.get("gamma_p", 0.5),
-            gamma_n=stage_cfg.get("gamma_n", 0.5),
+            a=stage_cfg.get("a", 0.1),
+            b=stage_cfg.get("b", 0.2),
             Tu=stage_cfg.get("Tu", 3),
             Tn=stage_cfg.get("Tn", 3),
             tau_u=stage_cfg.get("tau_u", 0.05),
             tau_n=stage_cfg.get("tau_n", 0.125),
             eps=stage_cfg.get("eps", 1e-6),
-            lambda_max=stage_cfg.get("lambda_max", 10.0),
         )
         return cls(
             image_size=cfg["data"].get("image_size", 256),
@@ -194,9 +185,6 @@ class FeatureGuidedElasticaADMMNet(nn.Module):
             alpha_u_scale=model_cfg.get("alpha_u_scale", 0.10),
             alpha_p_scale=model_cfg.get("alpha_p_scale", 0.05),
             alpha_n_scale=model_cfg.get("alpha_n_scale", 0.05),
-            use_adaptive_beta=model_cfg.get("use_adaptive_beta", False),
-            use_adaptive_mu=model_cfg.get("use_adaptive_mu", False),
             use_structure_head=model_cfg.get("use_structure_head", False),
-            structure_gamma=model_cfg.get("structure_gamma", 0.0),
             stage_hyper=hyper,
         )

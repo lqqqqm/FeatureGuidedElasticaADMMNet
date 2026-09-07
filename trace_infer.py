@@ -214,25 +214,20 @@ def trace_forward(model: FeatureGuidedElasticaADMMNet, gt: torch.Tensor, M: torc
             u_new = u_tilde + model._alpha(model.alpha_u, k, "u") * hole3 * du
         else:
             u_new = u_tilde
-        u_new = M * I_m + (1.0 - M) * u_new
 
         if stage.use_unrolling:
-            beta_p = (
-                stage.beta_head(torch.cat([F_ms, u_new, M], dim=1), stage.hyper.eps)
-                if stage.use_adaptive_beta
-                else stage.hyper.beta_p
-            )
             p_tilde = solve_p_shrink(
                 u=u_new,
+                m=m,
+                n=n,
+                lambda1=lambda1,
                 lambda2=lambda2,
+                a=stage.hyper.a,
+                b=stage.hyper.b,
+                r1=stage.hyper.r1,
                 r2=stage.hyper.r2,
-                beta_p=beta_p,
-                eps=stage.hyper.eps,
-                orient=structure_orient,
-                orient_weight=stage.structure_gamma,
             )
         else:
-            beta_p = None
             p_tilde = p
 
         base_p = grad(u_new) - p_tilde
@@ -258,27 +253,22 @@ def trace_forward(model: FeatureGuidedElasticaADMMNet, gt: torch.Tensor, M: torc
             m_new = solve_m_proj(
                 p=p_new,
                 n=n,
+                lambda1=lambda1,
                 lambda4=lambda4,
+                r1=stage.hyper.r1,
                 r4=stage.hyper.r4,
-                gamma_p=stage.hyper.gamma_p,
-                gamma_n=stage.hyper.gamma_n,
-            )
-            mu0 = (
-                stage.mu_head(torch.cat([F_ms, n, m_new, M], dim=1), stage.hyper.eps)
-                if stage.use_adaptive_mu
-                else stage.hyper.mu0
             )
             n_tilde = solve_n_gd(
                 n_init=n,
+                p=p_new,
                 m=m_new,
                 lambda4=lambda4,
                 r4=stage.hyper.r4,
-                mu0=mu0,
+                b=stage.hyper.b,
                 Tn=stage.hyper.Tn,
                 tau_n=stage.hyper.tau_n,
             )
         else:
-            mu0 = None
             m_new = normalize_vec(p_new, stage.hyper.eps)
             n_tilde = n
 
@@ -299,15 +289,12 @@ def trace_forward(model: FeatureGuidedElasticaADMMNet, gt: torch.Tensor, M: torc
             )
             n_new = normalize_vec(n_tilde + model._alpha(model.alpha_n, k, "n") * hole6 * dn, stage.hyper.eps)
         else:
-            n_new = normalize_vec(n_tilde, stage.hyper.eps)
+            n_new = n_tilde
 
         if stage.use_unrolling:
-            lambda1_new = lambda1 + stage.hyper.r1 * (vector_norm(p_new, stage.hyper.eps) - dot_mp(m_new, p_new))
+            lambda1_new = lambda1 + stage.hyper.r1 * (vector_norm(p_new) - dot_mp(m_new, p_new))
             lambda2_new = lambda2 + stage.hyper.r2 * (p_new - grad(u_new))
             lambda4_new = lambda4 + stage.hyper.r4 * (n_new - m_new)
-            lambda1_new = lambda1_new.clamp(-stage.hyper.lambda_max, stage.hyper.lambda_max)
-            lambda2_new = lambda2_new.clamp(-stage.hyper.lambda_max, stage.hyper.lambda_max)
-            lambda4_new = lambda4_new.clamp(-stage.hyper.lambda_max, stage.hyper.lambda_max)
         else:
             lambda1_new = lambda1
             lambda2_new = lambda2
@@ -331,10 +318,6 @@ def trace_forward(model: FeatureGuidedElasticaADMMNet, gt: torch.Tensor, M: torc
         add_tensor(trace, stats, f"{prefix}.lambda4", lambda4_new)
         add_tensor(trace, stats, f"{prefix}.structure_edge", structure_edge)
         add_tensor(trace, stats, f"{prefix}.structure_orient", structure_orient)
-        if torch.is_tensor(beta_p):
-            add_tensor(trace, stats, f"{prefix}.beta_p", beta_p)
-        if torch.is_tensor(mu0):
-            add_tensor(trace, stats, f"{prefix}.mu0", mu0)
 
         u, p, m, n = u_new, p_new, m_new, n_new
         lambda1, lambda2, lambda4 = lambda1_new, lambda2_new, lambda4_new

@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch import Tensor
 
 from .adapters import AdapterHead, MultiScaleFusion
@@ -14,7 +13,6 @@ from .operators import (
     dot_mp,
     grad,
     laplace,
-    laplace6,
     normalize_vec,
     proj_unit_ball,
     vector_norm,
@@ -28,40 +26,14 @@ class StageHyperParams:
     r2: float = 2.0
     r4: float = 1.0
     eta: float = 10.0
-    mu0: float = 0.2
-    beta_p: float = 0.1
-    gamma_p: float = 0.5
-    gamma_n: float = 0.5
+    a: float = 0.1
+    b: float = 0.2
     Tu: int = 3
     Tn: int = 3
     tau_u: float = 0.05
     tau_n: float = 0.125
     eps: float = 1e-6
-    lambda_max: float = 10.0
 
-
-
-class PositiveMapHead(nn.Module):
-    def __init__(self, cin: int, cout: int, base_value: float, max_value: float | None = None):
-        super().__init__()
-        self.base_value = float(base_value)
-        self.max_value = max_value
-        self.net = nn.Sequential(
-            nn.Conv2d(cin, 32, kernel_size=3, padding=1),
-            nn.GELU(),
-            nn.Conv2d(32, cout, kernel_size=3, padding=1),
-        )
-        nn.init.zeros_(self.net[-1].weight)
-        nn.init.zeros_(self.net[-1].bias)
-
-    def forward(self, x: Tensor, eps: float = 1e-6) -> Tensor:
-        y = F.softplus(self.net(x)) + eps
-        # Zero initialization gives softplus(0), so scale the first forward pass
-        # back to the scalar hyperparameter used by the fixed-energy baseline.
-        y = y * (self.base_value / F.softplus(y.new_zeros(())))
-        if self.max_value is not None:
-            y = y.clamp_max(float(self.max_value))
-        return y
 
 
 class StructureHead(nn.Module):
@@ -110,46 +82,54 @@ def solve_u_gd(
 
 def solve_p_shrink(
     u: Tensor,
+    m: Tensor,
+    n: Tensor,
+    lambda1: Tensor,
     lambda2: Tensor,
+    a: float,
+    b: float,
+    r1: float,
     r2: float,
-    beta_p: float | Tensor,
-    eps: float = 1e-6,
-    orient: Tensor | None = None,
-    orient_weight: float | Tensor = 0.0,
 ) -> Tensor:
-    q = grad(u) - lambda2 / r2
-    if orient is not None:
-        q = q + orient_weight * orient
-    return vector_shrink(q, beta_p / r2, eps)
+    """Derivation 4.2: p = shrink(q, c/r2), independently for each RGB channel."""
+    c = a + b * div(n).square() + r1 + lambda1
+    alignment = (r1 + lambda1) / r2  # [B, 3, H, W]
+    q = grad(u) + torch.cat([alignment, alignment], dim=1) * m - lambda2 / r2
+    return vector_shrink(q, c / r2)
 
 
 
 def solve_m_proj(
     p: Tensor,
     n: Tensor,
+    lambda1: Tensor,
     lambda4: Tensor,
+    r1: float,
     r4: float,
-    gamma_p: float = 0.5,
-    gamma_n: float = 0.5,
 ) -> Tensor:
-    w = gamma_p * p + gamma_n * (n + lambda4 / r4)
+    """Derivation 4.3: project n + (r1+lambda1)p/r4 + lambda4/r4."""
+    alignment = (r1 + lambda1) / r4
+    w = n + torch.cat([alignment, alignment], dim=1) * p + lambda4 / r4
     return proj_unit_ball(w)
 
 
 
 def solve_n_gd(
     n_init: Tensor,
+    p: Tensor,
     m: Tensor,
     lambda4: Tensor,
     r4: float,
-    mu0: float | Tensor,
+    b: float,
     Tn: int = 3,
     tau_n: float = 0.125,
 ) -> Tensor:
+    """GD for derivation 4.4, with the full weighted grad-div operator."""
     n = n_init
+    mu = b * vector_norm(p)  # [B, 3, H, W], same shape as div(n)
     rhs = 0.5 * r4 * m - 0.5 * lambda4
     for _ in range(Tn):
-        An = -mu0 * laplace6(n) + 0.5 * r4 * n
+        An = -grad(mu * div(n)) + 0.5 * r4 * n
         n = n - tau_n * (An - rhs)
     return n
 
@@ -162,10 +142,7 @@ class UnfoldStage(nn.Module):
         enable_p_correction: bool = False,
         enable_n_correction: bool = False,
         use_unrolling: bool = True,
-        use_adaptive_beta: bool = False,
-        use_adaptive_mu: bool = False,
         use_structure_head: bool = False,
-        structure_gamma: float = 0.0,
     ):
         super().__init__()
         self.hyper = hyper
@@ -173,10 +150,7 @@ class UnfoldStage(nn.Module):
         self.enable_p_correction = enable_p_correction
         self.enable_n_correction = enable_n_correction
         self.use_unrolling = use_unrolling
-        self.use_adaptive_beta = use_adaptive_beta
-        self.use_adaptive_mu = use_adaptive_mu
         self.use_structure_head = use_structure_head
-        self.structure_gamma = float(structure_gamma)
 
         self.fuse = MultiScaleFusion()
         self.psi_u = AdapterHead(128, 3, 3, 32)
@@ -186,8 +160,6 @@ class UnfoldStage(nn.Module):
         self.phi_u = CorrectionHead(3, 32, 3)
         self.phi_p = CorrectionHead(6, 32, 6)
         self.phi_n = CorrectionHead(6, 32, 6)
-        self.beta_head = PositiveMapHead(128 + 3 + 1, 3, hyper.beta_p)
-        self.mu_head = PositiveMapHead(128 + 6 + 6 + 1, 1, hyper.mu0)
         self.structure_head = StructureHead(128)
 
     def forward(
@@ -256,21 +228,18 @@ class UnfoldStage(nn.Module):
             u_new = u_tilde + alpha_u * hole3 * du
         else:
             u_new = u_tilde
-        u_new = M * I_m + (1.0 - M) * u_new
 
         if self.use_unrolling:
             p_tilde = solve_p_shrink(
                 u=u_new,
+                m=m,
+                n=n,
+                lambda1=lambda1,
                 lambda2=lambda2,
+                a=self.hyper.a,
+                b=self.hyper.b,
+                r1=self.hyper.r1,
                 r2=self.hyper.r2,
-                beta_p=(
-                    self.beta_head(torch.cat([F_ms, u_new, M], dim=1), self.hyper.eps)
-                    if self.use_adaptive_beta
-                    else self.hyper.beta_p
-                ),
-                eps=self.hyper.eps,
-                orient=structure_orient,
-                orient_weight=self.structure_gamma,
             )
         else:
             p_tilde = p
@@ -298,21 +267,18 @@ class UnfoldStage(nn.Module):
             m_new = solve_m_proj(
                 p=p_new,
                 n=n,
+                lambda1=lambda1,
                 lambda4=lambda4,
+                r1=self.hyper.r1,
                 r4=self.hyper.r4,
-                gamma_p=self.hyper.gamma_p,
-                gamma_n=self.hyper.gamma_n,
             )
             n_tilde = solve_n_gd(
                 n_init=n,
+                p=p_new,
                 m=m_new,
                 lambda4=lambda4,
                 r4=self.hyper.r4,
-                mu0=(
-                    self.mu_head(torch.cat([F_ms, n, m_new, M], dim=1), self.hyper.eps)
-                    if self.use_adaptive_mu
-                    else self.hyper.mu0
-                ),
+                b=self.hyper.b,
                 Tn=self.hyper.Tn,
                 tau_n=self.hyper.tau_n,
             )
@@ -338,16 +304,13 @@ class UnfoldStage(nn.Module):
             )
             n_new = normalize_vec(n_tilde + alpha_n * hole6 * dn, self.hyper.eps)
         else:
-            n_new = normalize_vec(n_tilde, self.hyper.eps)
+            n_new = n_tilde
 
         if self.use_unrolling:
-            lambda1_new = lambda1 + self.hyper.r1 * (vector_norm(p_new, self.hyper.eps) - dot_mp(m_new, p_new))
+            lambda1_new = lambda1 + self.hyper.r1 * (vector_norm(p_new) - dot_mp(m_new, p_new))
             lambda2_new = lambda2 + self.hyper.r2 * (p_new - grad(u_new))
             lambda4_new = lambda4 + self.hyper.r4 * (n_new - m_new)
 
-            lambda1_new = lambda1_new.clamp(-self.hyper.lambda_max, self.hyper.lambda_max)
-            lambda2_new = lambda2_new.clamp(-self.hyper.lambda_max, self.hyper.lambda_max)
-            lambda4_new = lambda4_new.clamp(-self.hyper.lambda_max, self.hyper.lambda_max)
         else:
             lambda1_new = lambda1
             lambda2_new = lambda2

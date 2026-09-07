@@ -43,26 +43,20 @@ model:
   alpha_u_scale: 0.10
   alpha_p_scale: 0.05
   alpha_n_scale: 0.05
-  use_adaptive_beta: true
-  use_adaptive_mu: true
   use_structure_head: true
-  structure_gamma: 0.05
 
 stage_hyper:
   r1: 1.0
   r2: 2.0
   r4: 1.0
   eta: 10.0
-  mu0: 0.2
-  beta_p: 0.1
-  gamma_p: 0.5
-  gamma_n: 0.5
+  a: 0.1
+  b: 0.2
   Tu: 5
   Tn: 5
   tau_u: 0.0625
   tau_n: 0.125
   eps: 1.0e-6
-  lambda_max: 10.0
 
 loss:
   lambda_rec: 1.0
