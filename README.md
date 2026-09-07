@@ -4,6 +4,8 @@
 
 使用前请读 [V1 公式、训练配置及诊断说明](docs/structure_prior_v1.md)。三组匹配对照为 `configs/structure_v1_r0.yaml`、`structure_v1_r1.yaml`、`structure_v1_r2.yaml`；下面的 MVP/full 配置不是这三组对照。
 
+在 GPU 电脑上可用 `python tools/run_structure_v1.py --runs r0 r1 r2` 依次训练并评估三组，或改用 `--runs r2` 只跑完整 V1。数据路径、断点恢复和汇总文件见 [一键训练与评估说明](docs/run_structure_v1.md)。
+
 一个可直接运行的 PyTorch 项目骨架，用于实现你这份 **Feature-Guided Euler's Elastica ADMM Unfolding + Transformer bottleneck** 图像修复方案。默认配置采用更稳的 MVP 版：
 
 - `K=3`
