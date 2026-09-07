@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import csv
+import json
+import subprocess
 import time
 from pathlib import Path
 from typing import Dict, Optional
@@ -13,24 +14,21 @@ from tqdm import tqdm
 from fg_elastica_inpaint.data.dataset import build_dataloaders
 from fg_elastica_inpaint.losses import InpaintingLoss
 from fg_elastica_inpaint.models import FeatureGuidedElasticaADMMNet
+from fg_elastica_inpaint.utils.diagnostics import (coupling_scale, output_diagnostics, evaluate_outputs,
+    identified_rows, write_rows, save_structure_samples, assert_finite_outputs)
 from fg_elastica_inpaint.utils.config import load_config, save_config
-from fg_elastica_inpaint.utils.image import save_triplet
 from fg_elastica_inpaint.utils.metrics import (
     MASK_RATIO_BUCKETS,
     FrechetInceptionDistance,
     OptionalLPIPS,
     composite_completed,
-    evaluate_per_image,
     mask_ratio_bucket,
     summarize_bucket_metrics,
     summarize_metric_items,
     validation_sanity,
 )
-from fg_elastica_inpaint.utils.misc import AverageMeter, append_csv_row, count_parameters, save_checkpoint, set_seed
+from fg_elastica_inpaint.utils.misc import AverageMeter, MaximumMeter, append_csv_row, count_parameters, save_checkpoint, set_seed
 from fg_elastica_inpaint.utils.scheduler import build_warmup_cosine_scheduler
-
-LOSS_KEYS = ["total", "rec", "edge", "perc", "stage", "p_cons", "n_m", "struct"]
-HOLE_METRIC_COLUMNS = {"psnr_hole", "ssim_hole", "lpips_hole", "edge_f1_hole", "gradient_l1_hole"}
 
 
 def _format_stats(stats: Optional[Dict], keys) -> str:
@@ -43,26 +41,11 @@ def _format_stats(stats: Optional[Dict], keys) -> str:
     return ", ".join(parts) if parts else "n/a"
 
 
-def _remove_hole_metric_columns(path: Path) -> None:
-    if not path.exists():
-        return
-    with path.open("r", newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        fieldnames = [name for name in (reader.fieldnames or []) if name not in HOLE_METRIC_COLUMNS and not name.endswith("_hole")]
-        rows = [{key: value for key, value in row.items() if key in fieldnames} for row in reader]
-    with path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
-
-
 def build_monitor(cfg: Dict, has_val: bool) -> Dict[str, object]:
     monitor_cfg = cfg.get("monitor", {})
     metric = monitor_cfg.get("metric")
     if metric is None:
         metric = "psnr" if has_val else "total"
-    if metric == "psnr_hole":
-        metric = "psnr"
 
     mode = monitor_cfg.get("mode")
     if mode is None:
@@ -116,31 +99,47 @@ def move_batch_to_device(batch: Dict, device: torch.device) -> Dict:
 
 def train_one_epoch(model, loader, optimizer, scheduler, criterion, scaler, device, cfg, epoch, out_dir: Path):
     model.train()
-    meters = {name: AverageMeter() for name in LOSS_KEYS}
+    meters = {}
+    if not len(loader):
+        raise ValueError("Training loader is empty: check train_list, limit and batch_size")
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
     pbar = tqdm(loader, desc=f"train {epoch}", leave=False)
     for step, batch in enumerate(pbar, start=1):
         batch = move_batch_to_device(batch, device)
         gt, M, I_m = batch["gt"], batch["mask"], batch["masked"]
         optimizer.zero_grad(set_to_none=True)
-        with torch.amp.autocast("cuda", enabled=cfg["optim"].get("amp", False)):
-            outputs = model(I_m, M)
+        rho_scale = coupling_scale(cfg, epoch - 1 + (step - 1) / len(loader))
+        with torch.amp.autocast(device.type, enabled=device.type == "cuda" and cfg["optim"].get("amp", False)):
+            outputs = model(I_m, M, rho_scale=rho_scale)
+            assert_finite_outputs(outputs)
             loss_dict = criterion(outputs, gt, M)
             loss = loss_dict["total"]
 
+        if not torch.isfinite(loss):
+            raise FloatingPointError(f"Nonfinite training loss at epoch={epoch}, step={step}")
         scaler.scale(loss).backward()
         scaler.unscale_(optimizer)
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=cfg["optim"].get("grad_clip", 1.0))
+        prior_grad = sum(float(p.grad.detach().square().sum()) for p in model.structure_prior.parameters()
+                         if p.grad is not None) ** .5 if model.structure_prior is not None else 0.0
+        grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=cfg["optim"].get("grad_clip", 1.0), error_if_nonfinite=True)
         scaler.step(optimizer)
         scaler.update()
         scheduler.step()
 
         bs = gt.shape[0]
-        for name, meter in meters.items():
-            meter.update(float(loss_dict[name].detach()), bs)
+        values = {name: float(value.detach()) for name, value in loss_dict.items()}
+        values.update(output_diagnostics(outputs))
+        values.update(rho_scale=rho_scale, structure_grad_norm=prior_grad, grad_norm=float(grad_norm))
+        for name, value in values.items():
+            meters.setdefault(name, MaximumMeter() if name.endswith("_max") else AverageMeter()).update(value, bs)
         pbar.set_postfix({k: f"{v.avg:.4f}" for k, v in meters.items() if k in ["total", "rec", "edge"]})
 
     row = {"epoch": epoch, "split": "train", "lr": optimizer.param_groups[0]["lr"], "num_batches": len(loader)}
     row.update({k: v.avg for k, v in meters.items()})
+    if device.type == "cuda":
+        row["peak_allocated_gib"] = torch.cuda.max_memory_allocated(device) / 2**30
+        row["peak_reserved_gib"] = torch.cuda.max_memory_reserved(device) / 2**30
     return row
 
 
@@ -149,17 +148,8 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
     if loader is None:
         return None
     model.eval()
-    loss_meters = {name: AverageMeter() for name in LOSS_KEYS}
-    metric_keys = [
-        "psnr",
-        "ssim",
-        "l1",
-        "edge_f1",
-        "gradient_l1",
-        "boundary_consistency",
-        "lpips",
-    ]
-    metric_meters = {name: AverageMeter() for name in metric_keys}
+    loss_meters = {}
+    metric_meters = {}
     lpips_metric = OptionalLPIPS(device) if cfg.get("eval", {}).get("compute_lpips", True) else None
     fid_metric = (
         FrechetInceptionDistance(device)
@@ -172,7 +162,11 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
         else {}
     )
     max_batches = cfg.get("eval", {}).get("max_batches")
-    first_saved = False
+    diagnostic_cfg = cfg.get("diagnostics", {})
+    sample_limit = int(diagnostic_cfg.get("fixed_samples", 16))
+    save_raw = epoch == 1 or epoch % int(diagnostic_cfg.get("raw_every", 5)) == 0
+    saved = 0
+    named_items = []
     per_image_items = []
     completed_min = float("inf")
     completed_max = float("-inf")
@@ -181,18 +175,22 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
     for batch_idx, batch in enumerate(pbar, start=1):
         batch = move_batch_to_device(batch, device)
         gt, M, I_m = batch["gt"], batch["mask"], batch["masked"]
-        outputs = model(I_m, M)
+        outputs = model(I_m, M, rho_scale=coupling_scale(cfg, epoch),
+                        return_stage_states=save_raw and saved < sample_limit)
         loss_dict = criterion(outputs, gt, M)
         pred = outputs["pred"]
 
         bs = gt.shape[0]
-        for name, meter in loss_meters.items():
-            meter.update(float(loss_dict[name].detach()), bs)
-        batch_items = evaluate_per_image(pred, gt, M, lpips_metric)
+        for name, value in loss_dict.items():
+            loss_meters.setdefault(name, AverageMeter()).update(float(value.detach()), bs)
+        batch_items = evaluate_outputs(outputs, gt, M, cfg, lpips_metric)
+        named_items.extend(identified_rows(batch_items, batch, len(per_image_items)))
         metrics = summarize_metric_items(batch_items)
         per_image_items.extend(batch_items)
         for name, value in metrics.items():
-            metric_meters[name].update(value, bs)
+            metric_meters.setdefault(name, MaximumMeter() if name.endswith("_max") else AverageMeter()).update(value, bs)
+        for name, value in output_diagnostics(outputs).items():
+            metric_meters.setdefault(name, MaximumMeter() if name.endswith("_max") else AverageMeter()).update(value, bs)
         completed = composite_completed(pred, gt, M)
         completed_min = min(completed_min, float(completed.min().detach()))
         completed_max = max(completed_max, float(completed.max().detach()))
@@ -204,9 +202,11 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
         show_keys = ["psnr", "ssim"]
         pbar.set_postfix({k: f"{metric_meters[k].avg:.3f}" for k in show_keys if metric_meters[k].count > 0})
 
-        if not first_saved:
-            save_triplet(I_m[:4].cpu(), pred[:4].cpu(), gt[:4].cpu(), out_dir / f"{split}_epoch_{epoch:04d}.png")
-            first_saved = True
+        if saved < sample_limit:
+            save_structure_samples(outputs, batch, out_dir / "diagnostics" / f"{split}_{epoch:04d}",
+                                   offset=saved, limit=sample_limit, save_raw=save_raw,
+                                   edge_scale=cfg.get("loss", {}).get("edge_scale", .1))
+            saved += bs
 
         if max_batches is not None and batch_idx >= int(max_batches):
             break
@@ -216,6 +216,8 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
     for name, meter in metric_meters.items():
         if meter.count > 0:
             row[name] = meter.avg
+    # Aggregate supported per-image regions, not means of unequal batch supports.
+    row.update(summarize_metric_items(per_image_items))
     if fid_metric is not None:
         try:
             row["fid"] = fid_metric.compute()
@@ -223,7 +225,6 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
             row["fid"] = float("nan")
             print(f"[Sanity:{split}] WARNING: FID failed: {exc}")
     bucket_rows = summarize_bucket_metrics(per_image_items)
-    _remove_hole_metric_columns(out_dir / "bucket_metrics.csv")
     for bucket_row in bucket_rows:
         if fid_bucket_metrics and int(bucket_row["num_samples"]) > 0:
             try:
@@ -235,6 +236,7 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
         append_csv_row(out_dir / "bucket_metrics.csv", bucket_row)
     for line in validation_sanity(per_image_items, completed_min, completed_max):
         print(f"[Sanity:{split}] {line}")
+    write_rows(out_dir / "per_image" / f"{split}_{epoch:04d}.csv", named_items)
     row.pop("epoch")
     row.pop("split")
     return row
@@ -257,7 +259,20 @@ def main():
 
     train_loader, val_loader, _ = build_dataloaders(cfg)
     model = FeatureGuidedElasticaADMMNet.from_config(cfg).to(device)
+    # Optional head initialization must not change data-order RNG in R0/R1/R2.
+    set_seed(int(cfg.get("seed", 42)))
     print(f"Model params: {count_parameters(model) / 1e6:.2f}M")
+    try:
+        revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    except (OSError, subprocess.CalledProcessError):
+        revision = "unavailable"
+    metadata = {"git_revision": revision, "torch": torch.__version__, "device": str(device),
+                "parameters": count_parameters(model), "config_path": str(Path(args.config).resolve()),
+                "prior_parameters": count_parameters(model.structure_prior) if model.structure_prior else 0}
+    if device.type == "cuda":
+        properties = torch.cuda.get_device_properties(device)
+        metadata.update(gpu=properties.name, dedicated_memory_gib=properties.total_memory/2**30)
+    (out_dir/"run_metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     monitor = build_monitor(cfg, has_val=val_loader is not None)
     print(
         "Monitor: "
@@ -266,22 +281,7 @@ def main():
         f"warmup_epochs={monitor['warmup_epochs']}"
     )
 
-    loss_cfg = cfg["loss"]
-    criterion = InpaintingLoss(
-        K=cfg["model"].get("K", 3),
-        lambda_rec=loss_cfg.get("lambda_rec", 1.0),
-        lambda_perc=loss_cfg.get("lambda_perc", 0.0),
-        lambda_edge=loss_cfg.get("lambda_edge", 1.0),
-        lambda_stage=loss_cfg.get("lambda_stage", 0.5),
-        hole_weight=loss_cfg.get("hole_weight", 6.0),
-        edge_hole_only=loss_cfg.get("edge_hole_only", True),
-        use_perceptual=loss_cfg.get("use_perceptual", False),
-        vgg_pretrained=loss_cfg.get("vgg_pretrained", False),
-        stage_weights=loss_cfg.get("stage_weights"),
-        lambda_p_cons=loss_cfg.get("lambda_p_cons", 0.0),
-        lambda_n_m=loss_cfg.get("lambda_n_m", 0.0),
-        lambda_struct=loss_cfg.get("lambda_struct", 0.0),
-    ).to(device)
+    criterion = InpaintingLoss.from_config(cfg).to(device)
 
     optim_cfg = cfg["optim"]
     optimizer = AdamW(
@@ -297,7 +297,7 @@ def main():
         total_steps=total_steps,
         min_ratio=optim_cfg.get("min_lr_ratio", 0.05),
     )
-    scaler = torch.amp.GradScaler("cuda", enabled=optim_cfg.get("amp", False))
+    scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda" and optim_cfg.get("amp", False))
 
     start_epoch = 1
     if args.resume:
@@ -316,6 +316,8 @@ def main():
 
     epochs = optim_cfg.get("epochs", 100)
     for epoch in range(start_epoch, epochs + 1):
+        # Reproducible epoch-level shuffling, augmentation and mask streams, also on resume.
+        set_seed(int(cfg.get("seed", 42)) + epoch)
         epoch_start = time.perf_counter()
         train_stats = train_one_epoch(model, train_loader, optimizer, scheduler, criterion, scaler, device, cfg, epoch, out_dir)
         val_stats = validate(model, val_loader, criterion, device, cfg, epoch, out_dir, split="val") if val_loader is not None else None
@@ -336,6 +338,11 @@ def main():
         elif epoch > int(monitor["warmup_epochs"]):
             monitor["bad_epochs"] = int(monitor["bad_epochs"]) + 1
 
+        structure_score = val_stats.get("hole_edge_f1") if val_stats else None
+        structure_improved = structure_score is not None and structure_score > monitor.get("best_structure_score", -float("inf"))
+        if structure_improved:
+            monitor["best_structure_score"] = structure_score
+            monitor["best_structure_epoch"] = epoch
         state = {
             "epoch": epoch,
             "model": model.state_dict(),
@@ -345,16 +352,18 @@ def main():
             "best_score": monitor["best_score"],
             "monitor": monitor,
             "config": cfg,
+            "structure_rho_scale": coupling_scale(cfg, epoch),
         }
         save_checkpoint(state, out_dir / "last.pt")
         save_checkpoint(state, out_dir / "latest.pt")
         if improved:
             save_checkpoint(state, out_dir / "best.pt")
+        if structure_improved:
+            save_checkpoint(state, out_dir / "best_structure.pt")
         if epoch % int(optim_cfg.get("save_every", 5)) == 0:
             save_checkpoint(state, out_dir / f"epoch_{epoch:04d}.pt")
 
         current_lr = optimizer.param_groups[0]["lr"]
-        _remove_hole_metric_columns(out_dir / "log.csv")
         train_row = dict(train_stats)
         train_row.update(
             {

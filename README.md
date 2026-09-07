@@ -1,5 +1,9 @@
 # Feature-Guided Elastica ADMM Inpainting
 
+当前 Stage 1 的 **Learned Structure Prior V1** 已接入：从现有多尺度语义特征预测带符号 RGB 梯度和 edge，在 p 子问题中加入显式二次结构项，最后用同一 u 方程的 PCG readout 得到粗修复图。
+
+使用前请读 [V1 公式、训练配置及诊断说明](docs/structure_prior_v1.md)。三组匹配对照为 `configs/structure_v1_r0.yaml`、`structure_v1_r1.yaml`、`structure_v1_r2.yaml`；下面的 MVP/full 配置不是这三组对照。
+
 一个可直接运行的 PyTorch 项目骨架，用于实现你这份 **Feature-Guided Euler's Elastica ADMM Unfolding + Transformer bottleneck** 图像修复方案。默认配置采用更稳的 MVP 版：
 
 - `K=3`
@@ -130,7 +134,7 @@ python infer.py \
 
 1. `MVP` 默认只开 `u correction`
 2. `tau_u` 默认用 `0.05`
-3. `lambda1` 仍然会更新并保存在 `aux` 里，但当前主更新仍主要由 `u/p/m/n + lambda2/lambda4` 驱动
+3. `lambda1` 按推导更新，并显式进入 p 的阈值、p 的方向项和 m 的投影中心
 4. `perceptual loss` 默认关闭，避免离线环境下载 VGG 权重时报错
 
 ## 9. 建议的调试顺序
@@ -149,6 +153,9 @@ python infer.py \
 - `epoch_xxxx.pt`
 - `config_resolved.yaml`
 - `log.csv`
-- `val_epoch_xxxx.png`
+- `best_structure.pt`（验证洞内 Edge F1 最优）
+- `run_metadata.json`
+- `per_image/val_xxxx.csv`（包含图像路径和 mask 哈希）
+- `diagnostics/val_xxxx/sample_xxx/`（固定样本的图像、结构图和可选原始张量）
 
-验证图默认是三联图：`masked | pred | gt`
+验证图默认是三联图：`masked | completed | gt`。缺失的 LPIPS 用 `lpips_available=0` 表示，不伪造零分。

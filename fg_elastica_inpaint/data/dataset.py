@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
@@ -77,11 +78,13 @@ class InpaintingImageDataset(Dataset):
         bucket_probs=None,
         mask_topology_modes=None,
         mask_topology_probs=None,
+        eval_mask_seed: int = 1701,
     ):
         self.paths = [str(Path(p).expanduser()) for p in file_list]
         self.image_size = image_size
         self.train = train
         self.resize_short_to = resize_short_to
+        self.eval_mask_seed = eval_mask_seed
         self.fixed_masks = FixedMaskLoader(fixed_mask_paths, image_size=image_size) if fixed_mask_paths else None
         self.random_masks = RandomMaskGenerator(
             size=image_size,
@@ -111,8 +114,18 @@ class InpaintingImageDataset(Dataset):
         gt = pil_to_tensor(img, value_range="minus_one_to_one")
         if self.fixed_masks is not None:
             M = self.fixed_masks[idx]
-        else:
+        elif self.train:
             M = self.random_masks(self.image_size, self.image_size)
+        else:
+            # Stable index -> mask mapping even without an external mask list.
+            py_state, np_state = random.getstate(), np.random.get_state()
+            try:
+                random.seed(self.eval_mask_seed + idx)
+                np.random.seed((self.eval_mask_seed + idx) % 2**32)
+                M = self.random_masks(self.image_size, self.image_size)
+            finally:
+                random.setstate(py_state)
+                np.random.set_state(np_state)
         I_m = gt * M
         return {
             "gt": gt,
@@ -147,6 +160,7 @@ def build_dataloader(
     mask_topology_modes=None,
     mask_topology_probs=None,
     limit: Optional[int] = None,
+    eval_mask_seed: int = 1701,
 ) -> DataLoader:
     file_list = read_file_list(file_list_path, limit=limit)
     fixed_mask_paths = read_file_list(fixed_mask_list) if fixed_mask_list else None
@@ -160,6 +174,7 @@ def build_dataloader(
         bucket_probs=bucket_probs,
         mask_topology_modes=mask_topology_modes,
         mask_topology_probs=mask_topology_probs,
+        eval_mask_seed=eval_mask_seed,
     )
     return DataLoader(
         ds,
@@ -199,6 +214,11 @@ def build_dataloaders(cfg: Dict):
             fixed_mask_list=data_cfg.get("val_mask_list"),
             resize_short_to=data_cfg.get("resize_short_to", 286),
             limit=data_cfg.get("val_limit"),
+            hole_buckets=data_cfg.get("hole_buckets"),
+            bucket_probs=data_cfg.get("bucket_probs"),
+            mask_topology_modes=data_cfg.get("mask_topology_modes"),
+            mask_topology_probs=data_cfg.get("mask_topology_probs"),
+            eval_mask_seed=data_cfg.get("eval_mask_seed", 1701),
         )
     if data_cfg.get("test_list"):
         test_loader = build_dataloader(
@@ -210,5 +230,10 @@ def build_dataloaders(cfg: Dict):
             fixed_mask_list=data_cfg.get("test_mask_list"),
             resize_short_to=data_cfg.get("resize_short_to", 286),
             limit=data_cfg.get("test_limit"),
+            hole_buckets=data_cfg.get("hole_buckets"),
+            bucket_probs=data_cfg.get("bucket_probs"),
+            mask_topology_modes=data_cfg.get("mask_topology_modes"),
+            mask_topology_probs=data_cfg.get("mask_topology_probs"),
+            eval_mask_seed=data_cfg.get("test_mask_seed", 2701),
         )
     return train_loader, val_loader, test_loader

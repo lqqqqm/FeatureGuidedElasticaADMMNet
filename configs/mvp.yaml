@@ -46,7 +46,7 @@ model:
   alpha_u_scale: 0.10
   alpha_p_scale: 0.05
   alpha_n_scale: 0.05
-  use_structure_head: false
+  use_structure_prior: false
 
 stage_hyper:
   r1: 1.0

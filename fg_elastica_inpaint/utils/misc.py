@@ -31,6 +31,21 @@ class AverageMeter:
         return self.sum / max(self.count, 1)
 
 
+class MaximumMeter:
+    """Keep the worst observed diagnostic across batches."""
+    def __init__(self):
+        self.value = -float("inf")
+        self.count = 0
+
+    def update(self, value: float, n: int = 1) -> None:
+        self.value = max(self.value, value)
+        self.count += n
+
+    @property
+    def avg(self) -> float:
+        return self.value if self.count else 0.0
+
+
 
 def count_parameters(model: torch.nn.Module) -> int:
     return sum(p.numel() for p in model.parameters() if p.requires_grad)

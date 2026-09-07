@@ -9,6 +9,8 @@ import torch.nn.functional as F
 
 from .backbone import SemanticBackbone
 from .operators import grad, normalize_vec
+from .solvers import solve_u_pcg
+from .structure_prior import LearnedStructurePrior
 from .unfolding import StageHyperParams, UnfoldStage
 
 
@@ -34,11 +36,25 @@ class FeatureGuidedElasticaADMMNet(nn.Module):
         alpha_u_scale: float = 0.10,
         alpha_p_scale: float = 0.05,
         alpha_n_scale: float = 0.05,
-        use_structure_head: bool = False,
+        use_structure_prior: bool = False,
+        structure_rho: float = 0.0,
+        use_pcg_readout: bool = False,
+        readout_iterations: int = 20,
+        readout_tolerance: float = 1e-5,
+        readout_backward_iterations: int = 80,
         stage_hyper: StageHyperParams | None = None,
     ):
         super().__init__()
+        if K < 1 or structure_rho < 0 or not math.isfinite(structure_rho):
+            raise ValueError("K must be positive and structure_rho nonnegative")
+        if structure_rho > 0 and (not use_structure_prior or not use_unrolling):
+            raise ValueError("Structure coupling requires both the structure prior and ADMM unrolling")
         self.K = K
+        self.structure_rho = float(structure_rho)
+        self.use_pcg_readout = use_pcg_readout
+        self.readout_iterations = readout_iterations
+        self.readout_tolerance = readout_tolerance
+        self.readout_backward_iterations = readout_backward_iterations
         self.use_softplus_alpha = use_softplus_alpha
         self.use_bounded_alpha = use_bounded_alpha
         self.alpha_scales = {
@@ -63,13 +79,15 @@ class FeatureGuidedElasticaADMMNet(nn.Module):
             enable_p_correction=enable_p_correction,
             enable_n_correction=enable_n_correction,
             use_unrolling=use_unrolling,
-            use_structure_head=use_structure_head,
         )
 
         self.alpha_u = nn.Parameter(torch.full((K,), self._init_alpha_raw(alpha_u_init, alpha_u_scale)))
         self.alpha_p = nn.Parameter(torch.full((K,), self._init_alpha_raw(alpha_p_init, alpha_p_scale)))
         self.alpha_n = nn.Parameter(torch.full((K,), self._init_alpha_raw(alpha_n_init, alpha_n_scale)))
         self.eps = self.stage_hyper.eps
+        # Initialize after the common model so R0/R1/R2 share backbone/stage
+        # initialization when their seeds are equal.
+        self.structure_prior = LearnedStructurePrior() if use_structure_prior else None
 
     def _init_alpha_raw(self, value: float, scale: float) -> float:
         if not self.use_bounded_alpha:
@@ -85,9 +103,23 @@ class FeatureGuidedElasticaADMMNet(nn.Module):
             return F.softplus(p[idx])
         return p[idx]
 
-    def forward(self, I_m: torch.Tensor, M: torch.Tensor) -> Dict[str, Any]:
+    def forward(self, I_m: torch.Tensor, M: torch.Tensor, *, rho_scale: float = 1.0,
+                return_stage_states: bool = False, prior_gradient: torch.Tensor | None = None,
+                disable_correction: bool = False) -> Dict[str, Any]:
+        if I_m.ndim != 4 or I_m.shape[1] != 3 or M.shape != I_m[:, :1].shape:
+            raise ValueError("Inputs must be RGB [B,3,H,W] and known mask [B,1,H,W]")
+        if I_m.shape[-2] % 8 or I_m.shape[-1] % 8:
+            raise ValueError("Image height and width must be multiples of 8")
+        if rho_scale < 0 or not math.isfinite(rho_scale):
+            raise ValueError("rho_scale must be finite and nonnegative")
         x = torch.cat([I_m, M], dim=1)
         F1, F2, F3 = self.backbone(x)
+        structure = self.structure_prior(F1, F2, F3, M) if self.structure_prior is not None else None
+        G = prior_gradient if prior_gradient is not None else (structure["gradient"] if structure else None)
+        # Backbone/structure CNNs may use autocast; all ADMM state is FP32.
+        I_m, M = I_m.float(), M.float()
+        F1, F2, F3 = F1.float(), F2.float(), F3.float()
+        G = G.float() if G is not None else None
 
         u = I_m
         p = grad(u)
@@ -102,34 +134,48 @@ class FeatureGuidedElasticaADMMNet(nn.Module):
         preds = []
         stage_aux = []
         for k in range(self.K):
-            u, p, m, n, lambda1, lambda2, lambda4, aux_k = self.stage(
-                u=u,
-                p=p,
-                m=m,
-                n=n,
-                lambda1=lambda1,
-                lambda2=lambda2,
-                lambda4=lambda4,
-                I_m=I_m,
-                M=M,
-                F1=F1,
-                F2=F2,
-                F3=F3,
-                alpha_u=self._alpha(self.alpha_u, k, "u"),
-                alpha_p=self._alpha(self.alpha_p, k, "p"),
-                alpha_n=self._alpha(self.alpha_n, k, "n"),
-            )
+            with torch.autocast(device_type=I_m.device.type, enabled=False):
+                u, p, m, n, lambda1, lambda2, lambda4, aux_k = self.stage(
+                    u=u,
+                    p=p,
+                    m=m,
+                    n=n,
+                    lambda1=lambda1,
+                    lambda2=lambda2,
+                    lambda4=lambda4,
+                    I_m=I_m,
+                    M=M,
+                    F1=F1,
+                    F2=F2,
+                    F3=F3,
+                    alpha_u=self._alpha(self.alpha_u, k, "u"),
+                    alpha_p=self._alpha(self.alpha_p, k, "p"),
+                    alpha_n=self._alpha(self.alpha_n, k, "n"),
+                    structure_gradient=G,
+                    rho_s=self.structure_rho * rho_scale,
+                    return_state=return_stage_states,
+                    disable_correction=disable_correction,
+                )
             preds.append(u)
             stage_aux.append(aux_k)
 
+        readout = {"u_before": u.detach()}
+        if self.use_pcg_readout:
+            u, info = solve_u_pcg(u, p, lambda2, I_m, M, self.stage_hyper.r2, self.stage_hyper.eta,
+                                 self.readout_iterations, self.readout_tolerance, self.readout_backward_iterations)
+            readout.update(info)
         comp = M * I_m + (1.0 - M) * u
-        structure_edge = next((item["structure_edge"] for item in reversed(stage_aux) if item["structure_edge"] is not None), None)
-        structure_orient = next((item["structure_orient"] for item in reversed(stage_aux) if item["structure_orient"] is not None), None)
+        structure_edge = structure["edge"] if structure else None
+        structure_orient = normalize_vec(structure["gradient"].float(), self.eps) if structure else None
         last_aux = stage_aux[-1] if stage_aux else {}
         return {
             "pred": u,
             "comp": comp,
             "stage_preds": preds,
+            "structure": structure,
+            "readout": readout,
+            "diagnostics": [item["diagnostics"] for item in stage_aux],
+            "stage_states": [item["state"] for item in stage_aux] if return_stage_states else [],
             "aux": {
                 "p": p,
                 "m": m,
@@ -185,6 +231,11 @@ class FeatureGuidedElasticaADMMNet(nn.Module):
             alpha_u_scale=model_cfg.get("alpha_u_scale", 0.10),
             alpha_p_scale=model_cfg.get("alpha_p_scale", 0.05),
             alpha_n_scale=model_cfg.get("alpha_n_scale", 0.05),
-            use_structure_head=model_cfg.get("use_structure_head", False),
+            use_structure_prior=model_cfg.get("use_structure_prior", False),
+            structure_rho=model_cfg.get("structure_rho", 0.0),
+            use_pcg_readout=model_cfg.get("use_pcg_readout", False),
+            readout_iterations=model_cfg.get("readout_iterations", 20),
+            readout_tolerance=model_cfg.get("readout_tolerance", 1e-5),
+            readout_backward_iterations=model_cfg.get("readout_backward_iterations", 80),
             stage_hyper=hyper,
         )

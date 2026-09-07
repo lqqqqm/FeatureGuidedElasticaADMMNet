@@ -9,6 +9,7 @@ import torch
 
 from fg_elastica_inpaint.models import FeatureGuidedElasticaADMMNet
 from fg_elastica_inpaint.utils.config import load_config
+from fg_elastica_inpaint.utils.diagnostics import checkpoint_coupling_scale, assert_finite_outputs
 from fg_elastica_inpaint.utils.image import pil_to_tensor, tensor_to_pil
 
 
@@ -63,7 +64,8 @@ def main():
     M = load_mask(args.mask, size, invert=args.invert_mask).to(device)
     I_m = gt * M
 
-    outputs = model(I_m, M)
+    outputs = model(I_m, M, rho_scale=checkpoint_coupling_scale(cfg, ckpt))
+    assert_finite_outputs(outputs)
     pred = outputs["pred"]
     comp = outputs["comp"]
 

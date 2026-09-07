@@ -19,12 +19,13 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from fg_elastica_inpaint.models import FeatureGuidedElasticaADMMNet
 from fg_elastica_inpaint.utils.config import load_config
+from fg_elastica_inpaint.utils.diagnostics import checkpoint_coupling_scale, evaluate_outputs
 from fg_elastica_inpaint.utils.image import pil_to_tensor, tensor_to_pil
 from fg_elastica_inpaint.utils.metrics import (
     FrechetInceptionDistance,
     OptionalLPIPS,
     composite_completed,
-    evaluate_per_image,
+    summarize_metric_items,
 )
 
 
@@ -132,6 +133,7 @@ def metric_summary(items: Sequence[Dict[str, float]], bucket_name: str) -> Dict[
     for name in METRIC_COLUMNS:
         values = [float(item[name]) for item in items if name in item and math.isfinite(float(item[name]))]
         row[name] = sum(values) / len(values) if values else float("nan")
+    row.update(summarize_metric_items(list(items)))
     return row
 
 
@@ -313,11 +315,11 @@ def main() -> None:
         mask = load_known_mask(mask_path, image_size, args.invert_mask).to(device)
         masked = gt * mask
 
-        outputs = model(masked, mask)
+        outputs = model(masked, mask, rho_scale=checkpoint_coupling_scale(cfg, checkpoint))
         pred = outputs["pred"]
         comp = composite_completed(pred, gt, mask)
         metric_tensor = comp if args.metric_target == "composite" else pred
-        item = evaluate_per_image(metric_tensor, gt, mask, lpips_metric)[0]
+        item = evaluate_outputs(outputs, gt, mask, cfg, lpips_metric)[0]
         hole_ratio = float(item["hole_ratio"])
         bucket_name = bucket_for_ratio(hole_ratio, buckets)
 
@@ -365,22 +367,7 @@ def main() -> None:
                 row["fid"] = float("nan")
                 row["fid_error"] = str(exc)
 
-    per_image_fields = [
-        "case_id",
-        "image",
-        "mask",
-        "bucket",
-        "metric_target",
-        "hole_ratio",
-        "psnr",
-        "ssim",
-        "l1",
-        "edge_f1",
-        "gradient_l1",
-        "boundary_consistency",
-        "lpips",
-    ]
-    write_csv(output_dir / "per_image_metrics.csv", per_image_rows, per_image_fields)
+    write_csv(output_dir / "per_image_metrics.csv", per_image_rows)
     write_csv(output_dir / "summary_by_bucket.csv", summary_rows)
     write_latex_table(output_dir / "benchmark_table.tex", summary_rows, args.caption, args.label)
     with (output_dir / "benchmark_results.json").open("w", encoding="utf-8") as handle:
