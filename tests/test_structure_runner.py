@@ -133,6 +133,36 @@ class StructureRunnerTests(unittest.TestCase):
         self.assertNotEqual(runner.main(self.arguments("--runs", "r2", "--resume", "--epochs", "2")), 0)
         self.assertEqual(before, self.events())
 
+    def test_resume_error_identifies_changed_config_fields(self):
+        runner = self.runner()
+        self.assertEqual(runner.main(self.arguments("--runs", "r2")), 0)
+        args = runner.parser().parse_args(self.arguments("--runs", "r2", "--resume", "--epochs", "2"))
+        output, configs = runner.make_configs(args)
+        with self.assertRaisesRegex(ValueError, r"config.optim.epochs: saved=40; current=2"):
+            runner.check_existing(output, configs, args, runner.check_data(configs["r2"]))
+
+    def test_resume_error_identifies_changed_data_list_separately(self):
+        runner = self.runner()
+        self.assertEqual(runner.main(self.arguments("--runs", "r2")), 0)
+        path = self.root/"train list.txt"
+        path.write_text("\n".join(reversed(path.read_text().splitlines())), encoding="utf-8")
+        args = runner.parser().parse_args(self.arguments("--runs", "r2", "--resume"))
+        output, configs = runner.make_configs(args)
+        with self.assertRaisesRegex(ValueError, r"list_sha256.train_list: saved="):
+            runner.check_existing(output, configs, args, runner.check_data(configs["r2"]))
+
+    def test_resume_accepts_code_changes_and_equivalent_cli_path_separators(self):
+        runner = self.runner()
+        lists = [flag for split in ("train", "val", "test")
+                 for flag in ("--"+split+"-list", str(self.root/f"{split} list.txt"))]
+        self.assertEqual(runner.main(self.arguments("--runs", "r2", *lists)), 0)
+        (self.root/"train.py").write_text(CHILD+"\n# Training-loop fix only\n", encoding="utf-8")
+        lists = [flag for split in ("train", "val", "test")
+                 for flag in ("--"+split+"-list", (self.root/f"{split} list.txt").as_posix())]
+        before = self.events()
+        self.assertEqual(runner.main(self.arguments("--runs", "r2", "--resume", *lists)), 0)
+        self.assertEqual(before, self.events())
+
     def test_mismatched_experiments_and_missing_images_fail_before_training(self):
         runner = self.runner()
         path = self.config_dir/"structure_v1_r1.yaml"

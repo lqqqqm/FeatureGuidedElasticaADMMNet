@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 import torch
-from tqdm import tqdm
 
 from fg_elastica_inpaint.data.dataset import build_dataloaders
 from fg_elastica_inpaint.losses import InpaintingLoss
@@ -25,11 +23,7 @@ from fg_elastica_inpaint.utils.metrics import (
     validation_sanity,
 )
 from fg_elastica_inpaint.utils.misc import AverageMeter, MaximumMeter, append_csv_row
-
-
-def progress_bar_enabled(cfg: dict) -> bool:
-    """Use progress bars only in interactive terminals to avoid noisy batch logs."""
-    return bool(cfg.get("logging", {}).get("progress_bar", sys.stderr.isatty()))
+from fg_elastica_inpaint.utils.progress import progress_bar
 
 
 @torch.no_grad()
@@ -73,7 +67,8 @@ def main():
     completed_min = float("inf")
     completed_max = float("-inf")
 
-    for batch in tqdm(loader, desc=f"evaluate:{args.split}", disable=not progress_bar_enabled(cfg)):
+    pbar = progress_bar(loader, desc=f"Evaluate {args.split}", cfg=cfg)
+    for batch in pbar:
         gt = batch["gt"].to(device)
         M = batch["mask"].to(device)
         I_m = batch["masked"].to(device)
@@ -90,6 +85,8 @@ def main():
         metrics.update(output_diagnostics(outputs))
         for name, value in metrics.items():
             metric_meters.setdefault(name, MaximumMeter() if name.endswith("_max") else AverageMeter()).update(value, bs)
+        pbar.set_postfix({key: f"{metric_meters[key].avg:.3f}" for key in ("psnr", "ssim")
+                         if key in metric_meters and metric_meters[key].count > 0}, refresh=False)
         completed = composite_completed(pred, gt, M)
         completed_min = min(completed_min, float(completed.min().detach()))
         completed_max = max(completed_max, float(completed.max().detach()))

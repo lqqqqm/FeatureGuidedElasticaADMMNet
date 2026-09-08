@@ -73,6 +73,10 @@ python tools/run_structure_v1.py --runs r0 r1 r2 --resume
 若失败发生在第一次 checkpoint 之前，该组会从头开始。
 
 脚本核对保存的配置和数据列表哈希，拒绝在旧目录中混用更改后的实验设置。
+不匹配时会逐项输出 `config.optim.amp` 等配置的 `saved` / `current` 值，或
+`list_sha256.train_list` 等发生变化的列表。列表哈希包含内容、顺序、编码和换行符，
+不包含文件修改时间。仅更新 `train.py` 不会触发该检查；命令参数中的 Windows
+路径分隔符 `/` 和 `\` 会先统一处理。
 需要改变训练轮数或数据划分时，选一个新的 `--output-dir`，避免恢复后学习率
 调度预算与原 checkpoint 不一致。仅更换评估用 checkpoint 允许复用原训练结果。
 
@@ -99,6 +103,36 @@ python tools/run_structure_v1.py --runs r0 r1 r2 --eval-only --checkpoint best_s
 旧的通用 `eval_test.json` 及逐图 CSV 先另存为 `eval_test_previous.json` 和
 `eval_test_previous_per_image.csv`；只有新生成、具有有效核心指标及逐图 CSV
 的结果才会写入本次汇总，失败不会混入旧指标。
+
+## 进度显示与日志
+
+通过入口脚本运行时，交互终端中的进度条每约 1 秒原地刷新，显示 epoch、
+batch 计数、百分比、速度、预计剩余时间及平均 loss。验证和评估使用同一风格，
+显示 PSNR/SSIM。首个 batch 完成后才会产生有效速度估计。
+
+`train.log` 和 `evaluate.log` 记录普通文本进度快照，约每 30 秒一次，并保留
+结束状态；AMP 提示和异常堆栈完整保留。把入口脚本的输出重定向到文件时，
+也会使用普通文本快照，避免写入终端重绘字符。
+
+从旧版本同步这次显示更新时，需要同时复制 `train.py`、`evaluate.py`、
+`tools/run_structure_v1.py` 和新增的 `fg_elastica_inpaint/utils/progress.py`。
+无需修改实验 YAML。已运行的 Python 进程保持原显示，新样式在下次启动时生效。
+
+## AMP 梯度溢出
+
+如果 loss 正常但缩放后的 FP16 反向传播产生 Inf/NaN，训练器会输出 `[AMP]`
+提示，跳过该批次的参数更新，并让 GradScaler 降低缩放系数。该次不会推进
+学习率调度器，也不会把无效梯度统计写进训练均值；后续批次继续训练。
+`amp_events.csv` 记录 epoch、step、缩放系数变化、异常参数名和图片路径。
+每轮训练统计新增 `optimizer_steps`、`amp_skipped_steps`、`amp_scale`。
+
+连续 8 个批次仍出现非有限梯度，或整轮没有一次有效更新时，训练会报错停止。
+未使用 GradScaler 时出现非有限梯度，以及前向输出或 loss 非有限，仍会直接报错。
+这些保护不会把坏梯度写入模型，也不修改结构监督或 ADMM 公式。
+
+对于开训后出现 `clip_grad_norm_ ... non-finite` 的旧版本，把更新后的 `train.py`
+同步到 GPU 电脑，然后在**原命令及原参数**后追加 `--resume`。若第一轮尚未保存
+`last.pt`，会从第一轮重新开始，不需要删除原实验目录或修改 YAML。
 
 ## 可选数值预检
 

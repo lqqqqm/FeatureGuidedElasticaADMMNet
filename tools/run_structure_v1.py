@@ -6,6 +6,7 @@ No packages are installed and no model equations are changed by this launcher.
 from __future__ import annotations
 
 import argparse
+import codecs
 from contextlib import contextmanager
 import copy
 import csv
@@ -219,6 +220,22 @@ def experiment_lock(output):
                 fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
 
+def describe_differences(saved, current, prefix):
+    """Report exact resume mismatches without changing the acceptance criteria."""
+    if isinstance(saved, dict) and isinstance(current, dict):
+        lines = []
+        for key in sorted(saved.keys() | current.keys()):
+            name = f"{prefix}.{key}"
+            if key not in saved:
+                lines.append(f"{name}: saved=<missing>; current={current[key]!r}")
+            elif key not in current:
+                lines.append(f"{name}: saved={saved[key]!r}; current=<missing>")
+            else:
+                lines.extend(describe_differences(saved[key], current[key], name))
+        return lines
+    return [f"{prefix}: saved={saved!r}; current={current!r}"] if saved != current else []
+
+
 def check_existing(output, configs, args, fingerprints):
     combined = dict(configs)
     for run in RUNS:
@@ -227,7 +244,9 @@ def check_existing(output, configs, args, fingerprints):
             combined[run] = load_yaml(saved)
             state = json.loads((output/run/"runner_state.json").read_text(encoding="utf-8"))
             if state.get("data_fingerprints") != fingerprints:
-                raise ValueError(f"Data lists changed since existing {run}; use a separate output directory")
+                details = describe_differences(state.get("data_fingerprints"), fingerprints, "list_sha256")
+                raise ValueError(f"Data lists changed since existing {run}:\n  " + "\n  ".join(details)
+                                 + "\nRestore the original lists or use a separate output directory.")
     validate_matched(combined)
     for run, cfg in configs.items():
         directory = output/run
@@ -240,29 +259,95 @@ def check_existing(output, configs, args, fingerprints):
         if not (directory/"runner_config.yaml").is_file() or not (directory/"runner_state.json").is_file():
             raise ValueError(f"Not a launcher-managed run: {directory}; use train.py/evaluate.py directly")
         state = json.loads((directory/"runner_state.json").read_text(encoding="utf-8"))
-        if load_yaml(directory/"runner_config.yaml") != cfg or state.get("data_fingerprints") != fingerprints:
-            raise ValueError(f"Config or data lists changed for {run}; use the original settings or a new output directory")
+        differences = describe_differences(load_yaml(directory/"runner_config.yaml"), cfg, "config")
+        differences.extend(describe_differences(state.get("data_fingerprints"), fingerprints, "list_sha256"))
+        if differences:
+            raise ValueError(f"Config or data lists changed for {run}:\n  " + "\n  ".join(differences)
+                             + f"\nSaved config: {directory/'runner_config.yaml'}"
+                             + f"\nSaved list hashes: {directory/'runner_state.json'}"
+                             + "\nList hashes include contents, order, encoding and line endings (not timestamps)."
+                             + "\nRestore the listed settings/files or use a new output directory; training was not started.")
         if args.eval_only and not (directory/args.checkpoint).is_file():
             raise FileNotFoundError(f"Missing evaluation checkpoint: {directory/args.checkpoint}")
+
+
+class ProgressRelay:
+    """Preserve terminal redraws while writing occasional plain progress lines."""
+
+    def __init__(self, console, log):
+        self.console, self.log = console, log
+        self.interactive = console.isatty()
+        self.buffer = []
+        self.progress = False
+        self.pending_cr = False
+        self.last_progress_time = -float("inf")
+        self.last_progress_line = None
+
+    def _record(self, final=False):
+        line = "".join(self.buffer).rstrip()
+        self.buffer.clear()
+        if not line:
+            return
+        if self.progress:
+            now = time.monotonic()
+            if line == self.last_progress_line or (not final and now - self.last_progress_time < 30):
+                return
+            self.last_progress_time, self.last_progress_line = now, line
+        self.log.write(line + "\n")
+        self.log.flush()
+        if not self.interactive:
+            self.console.write(line + "\n")
+            self.console.flush()
+
+    def feed(self, text):
+        if self.interactive:
+            self.console.write(text)
+            self.console.flush()
+        for char in text:
+            # Delay a CR boundary by one character so Windows CRLF is treated
+            # as a completed line, including the final progress snapshot.
+            if self.pending_cr:
+                self._record(final=char == "\n")
+                self.progress = char != "\n"
+                self.pending_cr = False
+                if char == "\n":
+                    continue
+            if char == "\r":
+                self.pending_cr = True
+            elif char == "\n":
+                self._record(final=True)
+                self.progress = False
+            else:
+                self.buffer.append(char)
+
+    def finish(self):
+        if self.interactive and (self.buffer or self.progress or self.pending_cr):
+            self.console.write("\n")
+            self.console.flush()
+        self._record(final=True)
 
 
 def run_command(command, logfile, device):
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
-    env.setdefault("TQDM_MININTERVAL", "30")
+    env["FG_ELASTICA_PROGRESS"] = "1"
+    env["COLUMNS"] = str(shutil.get_terminal_size(fallback=(110, 30)).columns)
     if device == "cpu":
         env["CUDA_VISIBLE_DEVICES"] = ""
     print("COMMAND: "+subprocess.list2cmdline(command), flush=True)
     with logfile.open("a", encoding="utf-8") as log:
         log.write("\n"+time.strftime("%Y-%m-%d %H:%M:%S")+" "+subprocess.list2cmdline(command)+"\n")
         log.flush()
-        with subprocess.Popen(command, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                              text=True, encoding="utf-8", errors="replace", bufsize=1) as child:
+        relay = ProgressRelay(sys.stdout, log)
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        # Binary reads preserve tqdm's carriage returns; text=True would turn
+        # them into newlines before the console ever sees them.
+        with subprocess.Popen(command, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) as child:
             try:
-                for line in child.stdout:
-                    sys.stdout.write(line); sys.stdout.flush()
-                    log.write(line); log.flush()
+                while chunk := child.stdout.read1(4096):
+                    relay.feed(decoder.decode(chunk))
+                relay.feed(decoder.decode(b"", final=True))
                 code = child.wait()
             except BaseException:
                 child.terminate()
@@ -271,6 +356,8 @@ def run_command(command, logfile, device):
                 except subprocess.TimeoutExpired:
                     child.kill(); child.wait()
                 raise
+            finally:
+                relay.finish()
         if code:
             raise RuntimeError(f"Command failed with exit code {code}; see {logfile}")
 

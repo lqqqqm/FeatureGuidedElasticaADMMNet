@@ -4,12 +4,12 @@ import argparse
 import json
 import subprocess
 import time
+from itertools import islice
 from pathlib import Path
 from typing import Dict, Optional
 
 import torch
 from torch.optim import AdamW
-from tqdm import tqdm
 
 from fg_elastica_inpaint.data.dataset import build_dataloaders
 from fg_elastica_inpaint.losses import InpaintingLoss
@@ -29,6 +29,7 @@ from fg_elastica_inpaint.utils.metrics import (
 )
 from fg_elastica_inpaint.utils.misc import AverageMeter, MaximumMeter, append_csv_row, count_parameters, save_checkpoint, set_seed
 from fg_elastica_inpaint.utils.scheduler import build_warmup_cosine_scheduler
+from fg_elastica_inpaint.utils.progress import progress_bar
 
 
 def _format_stats(stats: Optional[Dict], keys) -> str:
@@ -100,11 +101,12 @@ def move_batch_to_device(batch: Dict, device: torch.device) -> Dict:
 def train_one_epoch(model, loader, optimizer, scheduler, criterion, scaler, device, cfg, epoch, out_dir: Path):
     model.train()
     meters = {}
+    optimizer_steps = amp_skipped_steps = consecutive_overflows = 0
     if not len(loader):
         raise ValueError("Training loader is empty: check train_list, limit and batch_size")
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
-    pbar = tqdm(loader, desc=f"train {epoch}", leave=False)
+    pbar = progress_bar(loader, desc=f"Epoch {epoch}/{cfg['optim'].get('epochs', '?')}", cfg=cfg)
     for step, batch in enumerate(pbar, start=1):
         batch = move_batch_to_device(batch, device)
         gt, M, I_m = batch["gt"], batch["mask"], batch["masked"]
@@ -122,10 +124,44 @@ def train_one_epoch(model, loader, optimizer, scheduler, criterion, scaler, devi
         scaler.unscale_(optimizer)
         prior_grad = sum(float(p.grad.detach().square().sum()) for p in model.structure_prior.parameters()
                          if p.grad is not None) ** .5 if model.structure_prior is not None else 0.0
-        grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=cfg["optim"].get("grad_clip", 1.0), error_if_nonfinite=True)
+        try:
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                model.parameters(), max_norm=cfg["optim"].get("grad_clip", 1.0), error_if_nonfinite=True)
+        except RuntimeError as error:
+            message = str(error)
+            if not message.startswith("The total norm of order ") or "is non-finite" not in message:
+                raise  # Preserve unrelated clipping failures, including out-of-memory errors.
+            # Clipping raises before modifying gradients. unscale_ has already
+            # recorded AMP overflow, so GradScaler can safely skip this update.
+            named_grads = [(name, p.grad) for name, p in model.named_parameters() if p.grad is not None]
+            finite = torch.stack([torch.isfinite(g).all() for _, g in named_grads]).tolist() if named_grads else []
+            bad_names = [name for (name, _), ok in zip(named_grads, finite) if not ok]
+            del named_grads  # Do not retain discarded gradient buffers for the rest of the epoch.
+            if not bad_names:
+                raise  # A different clipping failure, including finite-gradient norm overflow.
+            detail = f"epoch={epoch}, step={step}, parameters={', '.join(bad_names[:8])}"
+            if not scaler.is_enabled():
+                raise FloatingPointError(f"Nonfinite gradients without AMP scaling: {detail}") from None
+            scale_before = scaler.get_scale()
+            scaler.step(optimizer)  # The recorded nonfinite gradients prevent optimizer.step().
+            scaler.update()
+            optimizer.zero_grad(set_to_none=True)
+            amp_skipped_steps += 1
+            consecutive_overflows += 1
+            append_csv_row(out_dir / "amp_events.csv", {
+                "epoch": epoch, "step": step, "scale_before": scale_before,
+                "scale_after": scaler.get_scale(), "bad_parameters": ";".join(bad_names),
+                "paths": json.dumps(batch.get("path", []), ensure_ascii=False),
+            })
+            pbar.write(f"[AMP] Skipped update ({detail}); scale {scale_before:g} -> {scaler.get_scale():g}")
+            if consecutive_overflows >= 8:
+                raise FloatingPointError(f"Persistent nonfinite gradients after 8 consecutive AMP backoffs: {detail}") from None
+            continue  # Do not advance the scheduler or include invalid gradient diagnostics.
         scaler.step(optimizer)
         scaler.update()
         scheduler.step()
+        optimizer_steps += 1
+        consecutive_overflows = 0
 
         bs = gt.shape[0]
         values = {name: float(value.detach()) for name, value in loss_dict.items()}
@@ -133,9 +169,12 @@ def train_one_epoch(model, loader, optimizer, scheduler, criterion, scaler, devi
         values.update(rho_scale=rho_scale, structure_grad_norm=prior_grad, grad_norm=float(grad_norm))
         for name, value in values.items():
             meters.setdefault(name, MaximumMeter() if name.endswith("_max") else AverageMeter()).update(value, bs)
-        pbar.set_postfix({k: f"{v.avg:.4f}" for k, v in meters.items() if k in ["total", "rec", "edge"]})
+        pbar.set_postfix(loss=f"{meters['total'].avg:.4f}", refresh=False)
 
-    row = {"epoch": epoch, "split": "train", "lr": optimizer.param_groups[0]["lr"], "num_batches": len(loader)}
+    if not optimizer_steps:
+        raise FloatingPointError(f"No optimizer updates in epoch={epoch}; inspect amp_events.csv before continuing")
+    row = {"epoch": epoch, "split": "train", "lr": optimizer.param_groups[0]["lr"], "num_batches": len(loader),
+           "optimizer_steps": optimizer_steps, "amp_skipped_steps": amp_skipped_steps, "amp_scale": scaler.get_scale()}
     row.update({k: v.avg for k, v in meters.items()})
     if device.type == "cuda":
         row["peak_allocated_gib"] = torch.cuda.max_memory_allocated(device) / 2**30
@@ -171,7 +210,9 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
     completed_min = float("inf")
     completed_max = float("-inf")
 
-    pbar = tqdm(loader, desc=f"{split} {epoch}", leave=False)
+    batch_count = min(len(loader), max(1, int(max_batches))) if max_batches is not None else len(loader)
+    pbar = progress_bar(islice(loader, batch_count), total=batch_count,
+                        desc=f"{split.capitalize()} {epoch}", cfg=cfg)
     for batch_idx, batch in enumerate(pbar, start=1):
         batch = move_batch_to_device(batch, device)
         gt, M, I_m = batch["gt"], batch["mask"], batch["masked"]
@@ -200,16 +241,13 @@ def validate(model, loader, criterion, device, cfg, epoch, out_dir: Path, split:
                 bucket = mask_ratio_bucket(float(item["hole_ratio"]))
                 fid_bucket_metrics[bucket].update(completed[sample_idx : sample_idx + 1], gt[sample_idx : sample_idx + 1])
         show_keys = ["psnr", "ssim"]
-        pbar.set_postfix({k: f"{metric_meters[k].avg:.3f}" for k in show_keys if metric_meters[k].count > 0})
+        pbar.set_postfix({k: f"{metric_meters[k].avg:.3f}" for k in show_keys if metric_meters[k].count > 0}, refresh=False)
 
         if saved < sample_limit:
             save_structure_samples(outputs, batch, out_dir / "diagnostics" / f"{split}_{epoch:04d}",
                                    offset=saved, limit=sample_limit, save_raw=save_raw,
                                    edge_scale=cfg.get("loss", {}).get("edge_scale", .1))
             saved += bs
-
-        if max_batches is not None and batch_idx >= int(max_batches):
-            break
 
     row = {"epoch": epoch, "split": split, "num_batches": min(len(loader), int(max_batches)) if max_batches is not None else len(loader)}
     row.update({k: v.avg for k, v in loss_meters.items()})
