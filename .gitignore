@@ -47,3 +47,7 @@ Desktop.ini
 .DS_Store
 
 *.zip
+
+# Local research outputs and freeze audits (reports are indexed in experiment-ledger).
+# Source/configuration provenance for released versions lives in docs/releases/.
+/analysis/

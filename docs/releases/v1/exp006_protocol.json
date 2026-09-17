@@ -1,0 +1,90 @@
+{
+  "experiment": "EXP-006",
+  "created_utc": "2026-09-15T09:45:16.639192+00:00",
+  "base_git_ref": "ref: refs/heads/improve-stage1-structure",
+  "base_git_commit": "d5ceebf99553e231e15ca14f4410b2814b1cfcb8",
+  "suite": "/1992910028/inpainting/FeatureGuidedElasticaADMMNet/outputs/ablation_20260915",
+  "training_source": "/1992910028/inpainting/FeatureGuidedElasticaADMMNet/outputs/ablation_20260915/source",
+  "source_manifest_sha256": "34dd3b5d1f295d19a58003d32fc00af972c6316093662e56b35c53daceeac741",
+  "config_differences": {
+    "loss.lambda_structure_consistency": {
+      "r0": 0.0,
+      "r1": 0.05,
+      "r2": 0.05
+    },
+    "loss.lambda_structure_edge": {
+      "r0": 0.0,
+      "r1": 0.2,
+      "r2": 0.2
+    },
+    "loss.lambda_structure_grad": {
+      "r0": 0.0,
+      "r1": 1.0,
+      "r2": 1.0
+    },
+    "loss.lambda_structure_orientation": {
+      "r0": 0.0,
+      "r1": 0.1,
+      "r2": 0.1
+    },
+    "model.use_structure_prior": {
+      "r0": false,
+      "r1": true,
+      "r2": true
+    },
+    "model.structure_rho": {
+      "r0": 0.0,
+      "r1": 0.0,
+      "r2": 16.0
+    },
+    "run_name": {
+      "r0": "exp006_r0_s42_fp32_b16",
+      "r1": "exp006_r1_s42_fp32_b16",
+      "r2": "exp006_r2_s42_fp32_b16"
+    }
+  },
+  "lists": {
+    "train": {
+      "path": "/1992910028/envs/inpainting-metax-setup/data-lists/train.txt",
+      "sha256": "cf838d881ea60de3eb509696552bbe0d232652bf1beffe454e722801ed234110",
+      "count": 24000
+    },
+    "val": {
+      "path": "/1992910028/envs/inpainting-metax-setup/data-lists/val.txt",
+      "sha256": "968e389308d79e9fb7dd36df2bbd350eda2d1f04d89926c00f21ebc2df92c8ea",
+      "count": 3000
+    },
+    "test": {
+      "path": "/1992910028/envs/inpainting-metax-setup/data-lists/test.txt",
+      "sha256": "f4b92343870e0b8178aa08e4bd87c90928d0867f7aa3b70b7e23bba055da947e",
+      "count": 3000
+    }
+  },
+  "seed": 42,
+  "initialization": "fresh random seed 42; common modules initialized before optional prior; verify hashes in preflight",
+  "data_rng": "existing train.py reseeds seed+epoch immediately before training loader iteration",
+  "batch_size": 16,
+  "epochs": 40,
+  "updates_per_epoch": 1500,
+  "planned_total_updates": 60000,
+  "precision": "FP32, AMP disabled; preserve model backend defaults; TF32 disabled only inside SSIM",
+  "lr": 0.0002,
+  "warmup_updates": 250,
+  "minimum_lr": 1e-05,
+  "optimizer": "AdamW",
+  "checkpoint_selection": {
+    "metric": "hole_psnr",
+    "min_delta": 0.01,
+    "mode": "max",
+    "patience": 0,
+    "warmup_epochs": 5
+  },
+  "launch_order": [
+    "r0",
+    "r2",
+    "r1"
+  ],
+  "launch_scope": "only R0 after passing checks; R1 and R2 configs prepared, not queued",
+  "resume": null,
+  "old_r2_note": "historical mixed-protocol R2 excluded from matched comparison"
+}

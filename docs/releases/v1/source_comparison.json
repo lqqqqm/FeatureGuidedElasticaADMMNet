@@ -1,0 +1,701 @@
+{
+  "version": "v1",
+  "audit_created_utc": "2026-09-17T07:55:58.555252+00:00",
+  "local_root": "D:\\code\\inpainting\\FeatureGuidedElasticaADMMNet",
+  "server_root": "/1992910028/inpainting/FeatureGuidedElasticaADMMNet",
+  "base_commit_before_freeze": "d5ceebf99553e231e15ca14f4410b2814b1cfcb8",
+  "server_git_head_observed": "ref: refs/heads/improve-stage1-structure",
+  "server_git_executable": null,
+  "scope": "Root source/documentation/dependency files plus fg_elastica_inpaint, configs, docs, tests, tools, evaluation. Data, environments and analysis outputs excluded.",
+  "hash_note": "SHA-256 of working file bytes at audit time; Git checkout newline conversion may change byte hashes. Git tag v1 identifies the complete committed tree, including new release documentation.",
+  "counts_before_reconciliation": {
+    "identical": 68,
+    "newline_only": 0,
+    "different": 2,
+    "local_only": 0,
+    "server_only": 4
+  },
+  "server_current_vs_exp006": {
+    "common_file_count": 63,
+    "common_paths": [
+      "README.md",
+      "configs/full.yaml",
+      "configs/metax_ablation_20260915/r0.yaml",
+      "configs/metax_ablation_20260915/r1.yaml",
+      "configs/metax_ablation_20260915/r2.yaml",
+      "configs/mvp.yaml",
+      "configs/mvp_kaggle_9k.yaml",
+      "configs/structure_v1_r0.yaml",
+      "configs/structure_v1_r1.yaml",
+      "configs/structure_v1_r2.yaml",
+      "docs/compare_v0_v1.md",
+      "docs/run_structure_v1.md",
+      "docs/structure_prior_v1.md",
+      "evaluate.py",
+      "fg_elastica_inpaint/__init__.py",
+      "fg_elastica_inpaint/data/__init__.py",
+      "fg_elastica_inpaint/data/dataset.py",
+      "fg_elastica_inpaint/data/mask_generator.py",
+      "fg_elastica_inpaint/losses/__init__.py",
+      "fg_elastica_inpaint/losses/inpainting.py",
+      "fg_elastica_inpaint/losses/perceptual.py",
+      "fg_elastica_inpaint/losses/structure.py",
+      "fg_elastica_inpaint/models/__init__.py",
+      "fg_elastica_inpaint/models/adapters.py",
+      "fg_elastica_inpaint/models/backbone.py",
+      "fg_elastica_inpaint/models/corrections.py",
+      "fg_elastica_inpaint/models/network.py",
+      "fg_elastica_inpaint/models/operators.py",
+      "fg_elastica_inpaint/models/solvers.py",
+      "fg_elastica_inpaint/models/structure_prior.py",
+      "fg_elastica_inpaint/models/unfolding.py",
+      "fg_elastica_inpaint/utils/__init__.py",
+      "fg_elastica_inpaint/utils/config.py",
+      "fg_elastica_inpaint/utils/diagnostics.py",
+      "fg_elastica_inpaint/utils/image.py",
+      "fg_elastica_inpaint/utils/metrics.py",
+      "fg_elastica_inpaint/utils/misc.py",
+      "fg_elastica_inpaint/utils/progress.py",
+      "fg_elastica_inpaint/utils/scheduler.py",
+      "fg_elastica_inpaint/utils/structure.py",
+      "requirements.txt",
+      "tests/test_model_comparison.py",
+      "tests/test_progress_output.py",
+      "tests/test_ssim_precision.py",
+      "tests/test_structure_core.py",
+      "tests/test_structure_diagnostics.py",
+      "tests/test_structure_integration.py",
+      "tests/test_structure_losses.py",
+      "tests/test_structure_metrics.py",
+      "tests/test_structure_preflight.py",
+      "tests/test_structure_runner.py",
+      "tests/test_training_amp.py",
+      "tools/compare_v0_v1.py",
+      "tools/comparison_worker.py",
+      "tools/diagnose_structure_prior.py",
+      "tools/make_filelist.py",
+      "tools/preflight_structure_v1.py",
+      "tools/prepare_and_run.py",
+      "tools/run_benchmark_mask_demo.py",
+      "tools/run_distance_mask_experiment.py",
+      "tools/run_random_mask_demo.py",
+      "tools/run_structure_v1.py",
+      "train.py"
+    ],
+    "byte_differences": [],
+    "only_current": [
+      ".gitignore",
+      "EXPERIMENT_PREP.md",
+      "benchmark_test_data.py",
+      "eulers_elastica_admm_derivation.md",
+      "evaluation/benchmark_fixed_masks.py",
+      "infer.py",
+      "kaggle_train.sh",
+      "prepare_kaggle.py",
+      "requirements_optional.txt",
+      "smoke_test.py",
+      "trace_infer.py"
+    ],
+    "only_frozen": [],
+    "frozen_source": "/1992910028/inpainting/FeatureGuidedElasticaADMMNet/outputs/ablation_20260915/source"
+  },
+  "server_working_files_modified_by_this_task": false,
+  "local_before_backup": "D:\\code\\inpainting\\FeatureGuidedElasticaADMMNet\\analysis\\version_freeze_20260917\\local_before",
+  "original_git_diff": "D:\\code\\inpainting\\FeatureGuidedElasticaADMMNet\\analysis\\version_freeze_20260917\\working_changes_before.patch",
+  "files": [
+    {
+      "path": ".gitignore",
+      "status": "identical",
+      "server_sha256": "4ec8457246e80b050fb61d9ccd0bcb1d02b775900bcc31ad028b3c3335ecea94",
+      "local_before_sha256": "4ec8457246e80b050fb61d9ccd0bcb1d02b775900bcc31ad028b3c3335ecea94",
+      "frozen_working_file_sha256": "52d9b6e52ff64f2203e6af71683e43536fb0e1236ef4dc4c4cad22e926ac883e",
+      "resolution": "Added release link / excluded local analysis artifacts."
+    },
+    {
+      "path": "EXPERIMENT_PREP.md",
+      "status": "identical",
+      "server_sha256": "7f560853d82afcf69da31f5e7f7101a7eb2015a22ba2ca238da6752a68a90257",
+      "local_before_sha256": "7f560853d82afcf69da31f5e7f7101a7eb2015a22ba2ca238da6752a68a90257",
+      "frozen_working_file_sha256": "7f560853d82afcf69da31f5e7f7101a7eb2015a22ba2ca238da6752a68a90257",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "README.md",
+      "status": "identical",
+      "server_sha256": "5b8be80218c42ff11557e7cf4b55a615b93c25fc189ff446e585499525179910",
+      "local_before_sha256": "5b8be80218c42ff11557e7cf4b55a615b93c25fc189ff446e585499525179910",
+      "frozen_working_file_sha256": "7e3dbc84f495edf0f5e56e587d0eed25ee3d10c5a754745a57cf4e1ba58444e6",
+      "resolution": "Added release link / excluded local analysis artifacts."
+    },
+    {
+      "path": "benchmark_test_data.py",
+      "status": "identical",
+      "server_sha256": "e2760742b02074536d7508ccdba26dcbc179a206afbca9580a6c8257ca7e2907",
+      "local_before_sha256": "e2760742b02074536d7508ccdba26dcbc179a206afbca9580a6c8257ca7e2907",
+      "frozen_working_file_sha256": "e2760742b02074536d7508ccdba26dcbc179a206afbca9580a6c8257ca7e2907",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "configs/full.yaml",
+      "status": "identical",
+      "server_sha256": "a25f6d0eaa5e05a89297b86f2f0a647ee9156c617cb25468859fb7c19eb17162",
+      "local_before_sha256": "a25f6d0eaa5e05a89297b86f2f0a647ee9156c617cb25468859fb7c19eb17162",
+      "frozen_working_file_sha256": "a25f6d0eaa5e05a89297b86f2f0a647ee9156c617cb25468859fb7c19eb17162",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "configs/metax_ablation_20260915/r0.yaml",
+      "status": "server_only",
+      "server_sha256": "d7dc156faebe8bb87d5adf6924d9e521fd337e5da1aad32ce9118e1a53227458",
+      "local_before_sha256": null,
+      "frozen_working_file_sha256": "d7dc156faebe8bb87d5adf6924d9e521fd337e5da1aad32ce9118e1a53227458",
+      "resolution": "Copied server bytes; original local file backed up if present."
+    },
+    {
+      "path": "configs/metax_ablation_20260915/r1.yaml",
+      "status": "server_only",
+      "server_sha256": "79d1425b12d4d14e5deae3815547c2275a611c1a3810ea519f91bc18df198d41",
+      "local_before_sha256": null,
+      "frozen_working_file_sha256": "79d1425b12d4d14e5deae3815547c2275a611c1a3810ea519f91bc18df198d41",
+      "resolution": "Copied server bytes; original local file backed up if present."
+    },
+    {
+      "path": "configs/metax_ablation_20260915/r2.yaml",
+      "status": "server_only",
+      "server_sha256": "83d4a65fd964f28a79a8ece2f864f4e11c6738bf1ce2636cb89823310bf62970",
+      "local_before_sha256": null,
+      "frozen_working_file_sha256": "83d4a65fd964f28a79a8ece2f864f4e11c6738bf1ce2636cb89823310bf62970",
+      "resolution": "Copied server bytes; original local file backed up if present."
+    },
+    {
+      "path": "configs/mvp.yaml",
+      "status": "identical",
+      "server_sha256": "728bec1633c524b730e84fce68368c2426b25e6ee74e5f2bf85fc2e8a084f87b",
+      "local_before_sha256": "728bec1633c524b730e84fce68368c2426b25e6ee74e5f2bf85fc2e8a084f87b",
+      "frozen_working_file_sha256": "728bec1633c524b730e84fce68368c2426b25e6ee74e5f2bf85fc2e8a084f87b",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "configs/mvp_kaggle_9k.yaml",
+      "status": "identical",
+      "server_sha256": "95a9811a1b9f3bc5eb04f2c04a2d4361563e1cc138013c0d76f8614991ed6991",
+      "local_before_sha256": "95a9811a1b9f3bc5eb04f2c04a2d4361563e1cc138013c0d76f8614991ed6991",
+      "frozen_working_file_sha256": "95a9811a1b9f3bc5eb04f2c04a2d4361563e1cc138013c0d76f8614991ed6991",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "configs/structure_v1_r0.yaml",
+      "status": "identical",
+      "server_sha256": "80e848dab76f9919d7321962f23fa6f72931b4515a1c1dbe018d6ae6c7e1aacf",
+      "local_before_sha256": "80e848dab76f9919d7321962f23fa6f72931b4515a1c1dbe018d6ae6c7e1aacf",
+      "frozen_working_file_sha256": "80e848dab76f9919d7321962f23fa6f72931b4515a1c1dbe018d6ae6c7e1aacf",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "configs/structure_v1_r1.yaml",
+      "status": "identical",
+      "server_sha256": "ceb67ac12f80005c503b6ae973e3429319403aa6255f2132e7520986dbb5bbb6",
+      "local_before_sha256": "ceb67ac12f80005c503b6ae973e3429319403aa6255f2132e7520986dbb5bbb6",
+      "frozen_working_file_sha256": "ceb67ac12f80005c503b6ae973e3429319403aa6255f2132e7520986dbb5bbb6",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "configs/structure_v1_r2.yaml",
+      "status": "identical",
+      "server_sha256": "686b43d6bd5b7b35fa1df3ac71fa99b0a7993e60b2f558b609e81e9a03deaa86",
+      "local_before_sha256": "686b43d6bd5b7b35fa1df3ac71fa99b0a7993e60b2f558b609e81e9a03deaa86",
+      "frozen_working_file_sha256": "686b43d6bd5b7b35fa1df3ac71fa99b0a7993e60b2f558b609e81e9a03deaa86",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "docs/compare_v0_v1.md",
+      "status": "identical",
+      "server_sha256": "665e122b4935cddc4f9875e84df66d62c3fcd5f36a8a89cd0d5012769df29718",
+      "local_before_sha256": "665e122b4935cddc4f9875e84df66d62c3fcd5f36a8a89cd0d5012769df29718",
+      "frozen_working_file_sha256": "665e122b4935cddc4f9875e84df66d62c3fcd5f36a8a89cd0d5012769df29718",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "docs/run_structure_v1.md",
+      "status": "identical",
+      "server_sha256": "c80f22160f92d9d3a8b75b4935314ede7467c9a7a8c0558c141ae461bca416c8",
+      "local_before_sha256": "c80f22160f92d9d3a8b75b4935314ede7467c9a7a8c0558c141ae461bca416c8",
+      "frozen_working_file_sha256": "c80f22160f92d9d3a8b75b4935314ede7467c9a7a8c0558c141ae461bca416c8",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "docs/structure_prior_v1.md",
+      "status": "identical",
+      "server_sha256": "cedf2887aba9679e73e7eafe7780af5fae1b0508ef7d9f3427b995d5cc18a9d7",
+      "local_before_sha256": "cedf2887aba9679e73e7eafe7780af5fae1b0508ef7d9f3427b995d5cc18a9d7",
+      "frozen_working_file_sha256": "cedf2887aba9679e73e7eafe7780af5fae1b0508ef7d9f3427b995d5cc18a9d7",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "eulers_elastica_admm_derivation.md",
+      "status": "identical",
+      "server_sha256": "d361d73f1b6d94f9e6bcfc1c5c80cbe94553d9d755cba826b1799d4e4f32a3bf",
+      "local_before_sha256": "d361d73f1b6d94f9e6bcfc1c5c80cbe94553d9d755cba826b1799d4e4f32a3bf",
+      "frozen_working_file_sha256": "d361d73f1b6d94f9e6bcfc1c5c80cbe94553d9d755cba826b1799d4e4f32a3bf",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "evaluate.py",
+      "status": "identical",
+      "server_sha256": "e7bf99dfdd6e69f6db562ed2905b5dd59cf2d76359b7cf507169820041a1195d",
+      "local_before_sha256": "e7bf99dfdd6e69f6db562ed2905b5dd59cf2d76359b7cf507169820041a1195d",
+      "frozen_working_file_sha256": "e7bf99dfdd6e69f6db562ed2905b5dd59cf2d76359b7cf507169820041a1195d",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "evaluation/benchmark_fixed_masks.py",
+      "status": "identical",
+      "server_sha256": "ce3ed2ef1d49f3e5d8605c10a750e6842fd43cc23980527ca7bd70071b04beb8",
+      "local_before_sha256": "ce3ed2ef1d49f3e5d8605c10a750e6842fd43cc23980527ca7bd70071b04beb8",
+      "frozen_working_file_sha256": "ce3ed2ef1d49f3e5d8605c10a750e6842fd43cc23980527ca7bd70071b04beb8",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/__init__.py",
+      "status": "identical",
+      "server_sha256": "0abc22df692cb0bc6ccd8488a9ff7b1b897e2ca753cee33e9b12a75af95b2dbf",
+      "local_before_sha256": "0abc22df692cb0bc6ccd8488a9ff7b1b897e2ca753cee33e9b12a75af95b2dbf",
+      "frozen_working_file_sha256": "0abc22df692cb0bc6ccd8488a9ff7b1b897e2ca753cee33e9b12a75af95b2dbf",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/data/__init__.py",
+      "status": "identical",
+      "server_sha256": "7de1a4277613cd0c03e065d84b594d7394d55e84580a831f9fa629330bc774be",
+      "local_before_sha256": "7de1a4277613cd0c03e065d84b594d7394d55e84580a831f9fa629330bc774be",
+      "frozen_working_file_sha256": "7de1a4277613cd0c03e065d84b594d7394d55e84580a831f9fa629330bc774be",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/data/dataset.py",
+      "status": "identical",
+      "server_sha256": "c246aec25883a9e7f03f30c109448521a4fa7d102dbd7942d7841bf4af35a4a7",
+      "local_before_sha256": "c246aec25883a9e7f03f30c109448521a4fa7d102dbd7942d7841bf4af35a4a7",
+      "frozen_working_file_sha256": "c246aec25883a9e7f03f30c109448521a4fa7d102dbd7942d7841bf4af35a4a7",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/data/mask_generator.py",
+      "status": "identical",
+      "server_sha256": "9b96b531fb23f1aa4e5e088a539e9c5c631976a86b62001466e4610ccc65ead5",
+      "local_before_sha256": "9b96b531fb23f1aa4e5e088a539e9c5c631976a86b62001466e4610ccc65ead5",
+      "frozen_working_file_sha256": "9b96b531fb23f1aa4e5e088a539e9c5c631976a86b62001466e4610ccc65ead5",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/losses/__init__.py",
+      "status": "identical",
+      "server_sha256": "8492e065063f46c2c1ca9b3c46eead987472348e58812ab75f9b12345985be3c",
+      "local_before_sha256": "8492e065063f46c2c1ca9b3c46eead987472348e58812ab75f9b12345985be3c",
+      "frozen_working_file_sha256": "8492e065063f46c2c1ca9b3c46eead987472348e58812ab75f9b12345985be3c",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/losses/inpainting.py",
+      "status": "identical",
+      "server_sha256": "0779b219c3ccd8d51be2130f5fa5c4464c6102bc7664e86b60f7007c47fb21e6",
+      "local_before_sha256": "0779b219c3ccd8d51be2130f5fa5c4464c6102bc7664e86b60f7007c47fb21e6",
+      "frozen_working_file_sha256": "0779b219c3ccd8d51be2130f5fa5c4464c6102bc7664e86b60f7007c47fb21e6",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/losses/perceptual.py",
+      "status": "identical",
+      "server_sha256": "dd230cec90e91c660a3cf0d54689cdf9a9bb69a6e46a696bfff808a22faa51ce",
+      "local_before_sha256": "dd230cec90e91c660a3cf0d54689cdf9a9bb69a6e46a696bfff808a22faa51ce",
+      "frozen_working_file_sha256": "dd230cec90e91c660a3cf0d54689cdf9a9bb69a6e46a696bfff808a22faa51ce",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/losses/structure.py",
+      "status": "identical",
+      "server_sha256": "0f88effeb92f92b9bb62b7471fb33e6b1868f4d9a9c59b053ac32457462b264f",
+      "local_before_sha256": "0f88effeb92f92b9bb62b7471fb33e6b1868f4d9a9c59b053ac32457462b264f",
+      "frozen_working_file_sha256": "0f88effeb92f92b9bb62b7471fb33e6b1868f4d9a9c59b053ac32457462b264f",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/models/__init__.py",
+      "status": "identical",
+      "server_sha256": "638e772117b35705ea7bd7add90b1ef268b71ed1f04db88f0d4b9cfc9935083f",
+      "local_before_sha256": "638e772117b35705ea7bd7add90b1ef268b71ed1f04db88f0d4b9cfc9935083f",
+      "frozen_working_file_sha256": "638e772117b35705ea7bd7add90b1ef268b71ed1f04db88f0d4b9cfc9935083f",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/models/adapters.py",
+      "status": "identical",
+      "server_sha256": "4c432c4845eefc70dfdafa6ba20b88b0bd15f51ee3308c65c70efae1c7a482e8",
+      "local_before_sha256": "4c432c4845eefc70dfdafa6ba20b88b0bd15f51ee3308c65c70efae1c7a482e8",
+      "frozen_working_file_sha256": "4c432c4845eefc70dfdafa6ba20b88b0bd15f51ee3308c65c70efae1c7a482e8",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/models/backbone.py",
+      "status": "identical",
+      "server_sha256": "fbaa0e5e40be700eca458f59d9a691171f7508aa879d5e950e855f25b3d6055c",
+      "local_before_sha256": "fbaa0e5e40be700eca458f59d9a691171f7508aa879d5e950e855f25b3d6055c",
+      "frozen_working_file_sha256": "fbaa0e5e40be700eca458f59d9a691171f7508aa879d5e950e855f25b3d6055c",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/models/corrections.py",
+      "status": "identical",
+      "server_sha256": "a39bf8060b09e8e69eabf26ec585d36910cf3699107ea29b65e22df0369bc95d",
+      "local_before_sha256": "a39bf8060b09e8e69eabf26ec585d36910cf3699107ea29b65e22df0369bc95d",
+      "frozen_working_file_sha256": "a39bf8060b09e8e69eabf26ec585d36910cf3699107ea29b65e22df0369bc95d",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/models/network.py",
+      "status": "identical",
+      "server_sha256": "1d42995dc7a153f7bbbed655227ecdc023a4c10717213a68f70b7e2886df83f7",
+      "local_before_sha256": "1d42995dc7a153f7bbbed655227ecdc023a4c10717213a68f70b7e2886df83f7",
+      "frozen_working_file_sha256": "1d42995dc7a153f7bbbed655227ecdc023a4c10717213a68f70b7e2886df83f7",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/models/operators.py",
+      "status": "identical",
+      "server_sha256": "92751331b2c70743790e1e5420b9587e59e21a50201435e7a25dda800ba421cd",
+      "local_before_sha256": "92751331b2c70743790e1e5420b9587e59e21a50201435e7a25dda800ba421cd",
+      "frozen_working_file_sha256": "92751331b2c70743790e1e5420b9587e59e21a50201435e7a25dda800ba421cd",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/models/solvers.py",
+      "status": "identical",
+      "server_sha256": "0dcfe17b769b35b928bf86aafdd25a61d2d5a334aeb173aaa019e1c3ba5c81d2",
+      "local_before_sha256": "0dcfe17b769b35b928bf86aafdd25a61d2d5a334aeb173aaa019e1c3ba5c81d2",
+      "frozen_working_file_sha256": "0dcfe17b769b35b928bf86aafdd25a61d2d5a334aeb173aaa019e1c3ba5c81d2",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/models/structure_prior.py",
+      "status": "identical",
+      "server_sha256": "5e4f1127f3530445f76f5eed7ca358e7a658b6206a2f5903147a876ae088c52a",
+      "local_before_sha256": "5e4f1127f3530445f76f5eed7ca358e7a658b6206a2f5903147a876ae088c52a",
+      "frozen_working_file_sha256": "5e4f1127f3530445f76f5eed7ca358e7a658b6206a2f5903147a876ae088c52a",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/models/unfolding.py",
+      "status": "identical",
+      "server_sha256": "599baf1ee28135ca09bf530826730760d0e7e9ad42bda3274a96a1d982d6609b",
+      "local_before_sha256": "599baf1ee28135ca09bf530826730760d0e7e9ad42bda3274a96a1d982d6609b",
+      "frozen_working_file_sha256": "599baf1ee28135ca09bf530826730760d0e7e9ad42bda3274a96a1d982d6609b",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/utils/__init__.py",
+      "status": "identical",
+      "server_sha256": "0abc22df692cb0bc6ccd8488a9ff7b1b897e2ca753cee33e9b12a75af95b2dbf",
+      "local_before_sha256": "0abc22df692cb0bc6ccd8488a9ff7b1b897e2ca753cee33e9b12a75af95b2dbf",
+      "frozen_working_file_sha256": "0abc22df692cb0bc6ccd8488a9ff7b1b897e2ca753cee33e9b12a75af95b2dbf",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/utils/config.py",
+      "status": "identical",
+      "server_sha256": "43c29a3d923854de211aed934a3d582ad3b8d30107804dc6c97ab896995cc2fa",
+      "local_before_sha256": "43c29a3d923854de211aed934a3d582ad3b8d30107804dc6c97ab896995cc2fa",
+      "frozen_working_file_sha256": "43c29a3d923854de211aed934a3d582ad3b8d30107804dc6c97ab896995cc2fa",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/utils/diagnostics.py",
+      "status": "identical",
+      "server_sha256": "46bc3511aab0e40b04daf4a375fbaa54c0cebe7743562681687037ce304fd9bc",
+      "local_before_sha256": "46bc3511aab0e40b04daf4a375fbaa54c0cebe7743562681687037ce304fd9bc",
+      "frozen_working_file_sha256": "46bc3511aab0e40b04daf4a375fbaa54c0cebe7743562681687037ce304fd9bc",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/utils/image.py",
+      "status": "identical",
+      "server_sha256": "0bb9e64de908d3f94ee6f794adbbd8faa510821188ad7c9f0561fe7cede8da12",
+      "local_before_sha256": "0bb9e64de908d3f94ee6f794adbbd8faa510821188ad7c9f0561fe7cede8da12",
+      "frozen_working_file_sha256": "0bb9e64de908d3f94ee6f794adbbd8faa510821188ad7c9f0561fe7cede8da12",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/utils/metrics.py",
+      "status": "different",
+      "server_sha256": "75f11f5c5de639f4ecae29b6026fa66a9197cfee907c76155133d10f47f7eaa9",
+      "same_python_ast": false,
+      "local_before_sha256": "d4f32021eb2700f626a7c27e979eb6970c1220ed82b4663d74bee3234860ea68",
+      "frozen_working_file_sha256": "75f11f5c5de639f4ecae29b6026fa66a9197cfee907c76155133d10f47f7eaa9",
+      "resolution": "Copied server bytes; original local file backed up if present."
+    },
+    {
+      "path": "fg_elastica_inpaint/utils/misc.py",
+      "status": "identical",
+      "server_sha256": "b44e169a1fe777cf3cce5079c3e6c2c5684cdf0e3d460b7b2b278374878dfd35",
+      "local_before_sha256": "b44e169a1fe777cf3cce5079c3e6c2c5684cdf0e3d460b7b2b278374878dfd35",
+      "frozen_working_file_sha256": "b44e169a1fe777cf3cce5079c3e6c2c5684cdf0e3d460b7b2b278374878dfd35",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/utils/progress.py",
+      "status": "identical",
+      "server_sha256": "47923e6f53030a9e4916bd615c33d3f312913b169ea9637195655866c37d0a8f",
+      "local_before_sha256": "47923e6f53030a9e4916bd615c33d3f312913b169ea9637195655866c37d0a8f",
+      "frozen_working_file_sha256": "47923e6f53030a9e4916bd615c33d3f312913b169ea9637195655866c37d0a8f",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/utils/scheduler.py",
+      "status": "identical",
+      "server_sha256": "739c258eb26815266512860132e0b3c032e7f306e7e2b544bcd78694d003c4ee",
+      "local_before_sha256": "739c258eb26815266512860132e0b3c032e7f306e7e2b544bcd78694d003c4ee",
+      "frozen_working_file_sha256": "739c258eb26815266512860132e0b3c032e7f306e7e2b544bcd78694d003c4ee",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "fg_elastica_inpaint/utils/structure.py",
+      "status": "identical",
+      "server_sha256": "1fa9cd67e0516eacafe148e4d1ac6f8b8f1005953a727d8a57da963f9a82a397",
+      "local_before_sha256": "1fa9cd67e0516eacafe148e4d1ac6f8b8f1005953a727d8a57da963f9a82a397",
+      "frozen_working_file_sha256": "1fa9cd67e0516eacafe148e4d1ac6f8b8f1005953a727d8a57da963f9a82a397",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "infer.py",
+      "status": "identical",
+      "server_sha256": "6215a81a66326cd0a9000b03958d864fb4a6e5f72c8980d8973e768806eeb09f",
+      "local_before_sha256": "6215a81a66326cd0a9000b03958d864fb4a6e5f72c8980d8973e768806eeb09f",
+      "frozen_working_file_sha256": "6215a81a66326cd0a9000b03958d864fb4a6e5f72c8980d8973e768806eeb09f",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "kaggle_train.sh",
+      "status": "identical",
+      "server_sha256": "6aef9877092e2735cad1c77b2409e3ee8edf62f907a21fbb23953f6d4f8873f2",
+      "local_before_sha256": "6aef9877092e2735cad1c77b2409e3ee8edf62f907a21fbb23953f6d4f8873f2",
+      "frozen_working_file_sha256": "6aef9877092e2735cad1c77b2409e3ee8edf62f907a21fbb23953f6d4f8873f2",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "prepare_kaggle.py",
+      "status": "identical",
+      "server_sha256": "acf2b6754d695b1178d054d43f263646f13c7759b0c15d952be08eaf8ce7dc33",
+      "local_before_sha256": "acf2b6754d695b1178d054d43f263646f13c7759b0c15d952be08eaf8ce7dc33",
+      "frozen_working_file_sha256": "acf2b6754d695b1178d054d43f263646f13c7759b0c15d952be08eaf8ce7dc33",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "requirements.txt",
+      "status": "identical",
+      "server_sha256": "42fcdd6e414cd792214110266c7cbdaf38a425087c6acd67c13fc309096c6685",
+      "local_before_sha256": "42fcdd6e414cd792214110266c7cbdaf38a425087c6acd67c13fc309096c6685",
+      "frozen_working_file_sha256": "42fcdd6e414cd792214110266c7cbdaf38a425087c6acd67c13fc309096c6685",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "requirements_optional.txt",
+      "status": "identical",
+      "server_sha256": "be4c4eaddf26f67bb2ea3e1af710737da8958e80336bd40cce4c4180ea2bdb4d",
+      "local_before_sha256": "be4c4eaddf26f67bb2ea3e1af710737da8958e80336bd40cce4c4180ea2bdb4d",
+      "frozen_working_file_sha256": "be4c4eaddf26f67bb2ea3e1af710737da8958e80336bd40cce4c4180ea2bdb4d",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "smoke_test.py",
+      "status": "identical",
+      "server_sha256": "340753878428e691f0744a7b5f0edc54d5cda240936df940f12f2f4f5491c229",
+      "local_before_sha256": "340753878428e691f0744a7b5f0edc54d5cda240936df940f12f2f4f5491c229",
+      "frozen_working_file_sha256": "340753878428e691f0744a7b5f0edc54d5cda240936df940f12f2f4f5491c229",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tests/test_model_comparison.py",
+      "status": "identical",
+      "server_sha256": "8f52404a38cd962b4a820c8f46003227e42f91f83c1c0783aa6ee433f0d92518",
+      "local_before_sha256": "8f52404a38cd962b4a820c8f46003227e42f91f83c1c0783aa6ee433f0d92518",
+      "frozen_working_file_sha256": "8f52404a38cd962b4a820c8f46003227e42f91f83c1c0783aa6ee433f0d92518",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tests/test_progress_output.py",
+      "status": "identical",
+      "server_sha256": "e6cdb6c504a8218e699f9f97979a59177a3156112f493cb03046f4ad3af0402c",
+      "local_before_sha256": "e6cdb6c504a8218e699f9f97979a59177a3156112f493cb03046f4ad3af0402c",
+      "frozen_working_file_sha256": "e6cdb6c504a8218e699f9f97979a59177a3156112f493cb03046f4ad3af0402c",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tests/test_ssim_precision.py",
+      "status": "server_only",
+      "server_sha256": "213bc1ff19cb66675c49b3c4f6ee49aa268740d94a7424c28b2279413de9b6de",
+      "local_before_sha256": null,
+      "frozen_working_file_sha256": "213bc1ff19cb66675c49b3c4f6ee49aa268740d94a7424c28b2279413de9b6de",
+      "resolution": "Copied server bytes; original local file backed up if present."
+    },
+    {
+      "path": "tests/test_structure_core.py",
+      "status": "identical",
+      "server_sha256": "37abac2024f378164e3986eaac16fd4dd44bbeca03bba4d2d1edd4390978fcab",
+      "local_before_sha256": "37abac2024f378164e3986eaac16fd4dd44bbeca03bba4d2d1edd4390978fcab",
+      "frozen_working_file_sha256": "37abac2024f378164e3986eaac16fd4dd44bbeca03bba4d2d1edd4390978fcab",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tests/test_structure_diagnostics.py",
+      "status": "identical",
+      "server_sha256": "24a51c160099d371adfd154c5fcb6b4dd86a7e5ad348556943559820f95fff22",
+      "local_before_sha256": "24a51c160099d371adfd154c5fcb6b4dd86a7e5ad348556943559820f95fff22",
+      "frozen_working_file_sha256": "24a51c160099d371adfd154c5fcb6b4dd86a7e5ad348556943559820f95fff22",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tests/test_structure_integration.py",
+      "status": "identical",
+      "server_sha256": "12b91fb2734e2ed829e46b2303d00faa2da94a9dbd533691d83b623c4f4fb6c4",
+      "local_before_sha256": "12b91fb2734e2ed829e46b2303d00faa2da94a9dbd533691d83b623c4f4fb6c4",
+      "frozen_working_file_sha256": "12b91fb2734e2ed829e46b2303d00faa2da94a9dbd533691d83b623c4f4fb6c4",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tests/test_structure_losses.py",
+      "status": "identical",
+      "server_sha256": "835f163082e07a5af42fa23062d75b9e8464b89fb4ac4a245f1d77d85875c5ae",
+      "local_before_sha256": "835f163082e07a5af42fa23062d75b9e8464b89fb4ac4a245f1d77d85875c5ae",
+      "frozen_working_file_sha256": "835f163082e07a5af42fa23062d75b9e8464b89fb4ac4a245f1d77d85875c5ae",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tests/test_structure_metrics.py",
+      "status": "identical",
+      "server_sha256": "eb122f0a82e89fdae3ca41016b6cd4319220b19599361ba611102b713f5e034c",
+      "local_before_sha256": "eb122f0a82e89fdae3ca41016b6cd4319220b19599361ba611102b713f5e034c",
+      "frozen_working_file_sha256": "eb122f0a82e89fdae3ca41016b6cd4319220b19599361ba611102b713f5e034c",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tests/test_structure_preflight.py",
+      "status": "identical",
+      "server_sha256": "9b081314c899f52cd0c729da52dcf37f25c98b3c0d3bebe5fb976b7d2b67dce6",
+      "local_before_sha256": "9b081314c899f52cd0c729da52dcf37f25c98b3c0d3bebe5fb976b7d2b67dce6",
+      "frozen_working_file_sha256": "9b081314c899f52cd0c729da52dcf37f25c98b3c0d3bebe5fb976b7d2b67dce6",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tests/test_structure_runner.py",
+      "status": "identical",
+      "server_sha256": "58b3715c025095ffb84fd41f6244750997c2b82e5fe61ab2a92b42b548a2c8b6",
+      "local_before_sha256": "58b3715c025095ffb84fd41f6244750997c2b82e5fe61ab2a92b42b548a2c8b6",
+      "frozen_working_file_sha256": "58b3715c025095ffb84fd41f6244750997c2b82e5fe61ab2a92b42b548a2c8b6",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tests/test_training_amp.py",
+      "status": "identical",
+      "server_sha256": "f56a615cea5000e2a03fc228037c0b213579ad26093ec03c79de1c67b4087898",
+      "local_before_sha256": "f56a615cea5000e2a03fc228037c0b213579ad26093ec03c79de1c67b4087898",
+      "frozen_working_file_sha256": "f56a615cea5000e2a03fc228037c0b213579ad26093ec03c79de1c67b4087898",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tools/compare_v0_v1.py",
+      "status": "identical",
+      "server_sha256": "410d50eac5f681709cf7e54f5790a183cc4d21953923088bfd1af0e84343df28",
+      "local_before_sha256": "410d50eac5f681709cf7e54f5790a183cc4d21953923088bfd1af0e84343df28",
+      "frozen_working_file_sha256": "410d50eac5f681709cf7e54f5790a183cc4d21953923088bfd1af0e84343df28",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tools/comparison_worker.py",
+      "status": "identical",
+      "server_sha256": "2de990ffa48d6622288fe04c3b6e0811a2c79b3f662f3d28db51ff2a2b8f9aa1",
+      "local_before_sha256": "2de990ffa48d6622288fe04c3b6e0811a2c79b3f662f3d28db51ff2a2b8f9aa1",
+      "frozen_working_file_sha256": "2de990ffa48d6622288fe04c3b6e0811a2c79b3f662f3d28db51ff2a2b8f9aa1",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tools/diagnose_structure_prior.py",
+      "status": "identical",
+      "server_sha256": "46990a52cb97ae6f782db6eb007fce8b96eb5970c4ba383094fe33e1791a1bc4",
+      "local_before_sha256": "46990a52cb97ae6f782db6eb007fce8b96eb5970c4ba383094fe33e1791a1bc4",
+      "frozen_working_file_sha256": "46990a52cb97ae6f782db6eb007fce8b96eb5970c4ba383094fe33e1791a1bc4",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tools/make_filelist.py",
+      "status": "identical",
+      "server_sha256": "ab5c15b0a52e1f5986eff19a93c359e116b65ae9c2fa67761cde59bde0cea08c",
+      "local_before_sha256": "ab5c15b0a52e1f5986eff19a93c359e116b65ae9c2fa67761cde59bde0cea08c",
+      "frozen_working_file_sha256": "ab5c15b0a52e1f5986eff19a93c359e116b65ae9c2fa67761cde59bde0cea08c",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tools/preflight_structure_v1.py",
+      "status": "identical",
+      "server_sha256": "0e3a3d2a3474d5edf4153eadfdf6e2615562a5e17bda2538bb5470fc59b35b8e",
+      "local_before_sha256": "0e3a3d2a3474d5edf4153eadfdf6e2615562a5e17bda2538bb5470fc59b35b8e",
+      "frozen_working_file_sha256": "0e3a3d2a3474d5edf4153eadfdf6e2615562a5e17bda2538bb5470fc59b35b8e",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tools/prepare_and_run.py",
+      "status": "identical",
+      "server_sha256": "1508638d77c1f8f8d8152b37d8e2409efc6f3f1397e15f99d998d4eeaf137df4",
+      "local_before_sha256": "1508638d77c1f8f8d8152b37d8e2409efc6f3f1397e15f99d998d4eeaf137df4",
+      "frozen_working_file_sha256": "1508638d77c1f8f8d8152b37d8e2409efc6f3f1397e15f99d998d4eeaf137df4",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tools/run_benchmark_mask_demo.py",
+      "status": "identical",
+      "server_sha256": "74dffb8f654dddf3edde7590b589884d816587ea9ca7a6d1ccbeb047d27d8ed0",
+      "local_before_sha256": "74dffb8f654dddf3edde7590b589884d816587ea9ca7a6d1ccbeb047d27d8ed0",
+      "frozen_working_file_sha256": "74dffb8f654dddf3edde7590b589884d816587ea9ca7a6d1ccbeb047d27d8ed0",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tools/run_distance_mask_experiment.py",
+      "status": "identical",
+      "server_sha256": "935e3c83cd22ad836a104dbe748393d39dda21374167b1ab3dd156b443cc9614",
+      "local_before_sha256": "935e3c83cd22ad836a104dbe748393d39dda21374167b1ab3dd156b443cc9614",
+      "frozen_working_file_sha256": "935e3c83cd22ad836a104dbe748393d39dda21374167b1ab3dd156b443cc9614",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tools/run_random_mask_demo.py",
+      "status": "identical",
+      "server_sha256": "ebcdd4aa2424342df8d97e5381afeb310ac2669b27ac7d37eca9ccd253181761",
+      "local_before_sha256": "ebcdd4aa2424342df8d97e5381afeb310ac2669b27ac7d37eca9ccd253181761",
+      "frozen_working_file_sha256": "ebcdd4aa2424342df8d97e5381afeb310ac2669b27ac7d37eca9ccd253181761",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "tools/run_structure_v1.py",
+      "status": "identical",
+      "server_sha256": "71f5339e357482afb713a50326107608158312f998d04399439005a2d90df6f9",
+      "local_before_sha256": "71f5339e357482afb713a50326107608158312f998d04399439005a2d90df6f9",
+      "frozen_working_file_sha256": "71f5339e357482afb713a50326107608158312f998d04399439005a2d90df6f9",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "trace_infer.py",
+      "status": "identical",
+      "server_sha256": "55bbdab1d6ca3fa8fb8fedff8fb3f3624fa12b60b6d4ebab2942db9ab7176f27",
+      "local_before_sha256": "55bbdab1d6ca3fa8fb8fedff8fb3f3624fa12b60b6d4ebab2942db9ab7176f27",
+      "frozen_working_file_sha256": "55bbdab1d6ca3fa8fb8fedff8fb3f3624fa12b60b6d4ebab2942db9ab7176f27",
+      "resolution": "Preserved."
+    },
+    {
+      "path": "train.py",
+      "status": "different",
+      "server_sha256": "0cac10dabf06f9671e7af22a25db451157642e5c40e14acf8d7c3ae6af0f28ff",
+      "same_python_ast": false,
+      "local_before_sha256": "057e0cb2d1c0e9db4b730d167d8321e00ffed9dc25dc5eebc208acb017cbb67c",
+      "frozen_working_file_sha256": "0cac10dabf06f9671e7af22a25db451157642e5c40e14acf8d7c3ae6af0f28ff",
+      "resolution": "Copied server bytes; original local file backed up if present."
+    }
+  ]
+}

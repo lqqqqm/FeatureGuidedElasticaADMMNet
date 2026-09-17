@@ -1,0 +1,35 @@
+{
+  "version": "v1",
+  "date": "2026-09-17",
+  "local": {
+    "command": "python -m pytest tests -q --disable-warnings",
+    "passed": 93,
+    "skipped": 1,
+    "seconds": 134.39,
+    "skip_reason": "CUDA/MetaX test unavailable on CPU-only local environment; covered separately on server.",
+    "python": "3.12.7 | packaged by Anaconda, Inc. | (main, Oct  4 2024, 13:17:27) [MSC v.1929 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "torch": "2.11.0",
+      "PyYAML": "6.0.1",
+      "Pillow": "12.2.0",
+      "pytest": "7.4.4"
+    },
+    "log_path": "D:\\code\\inpainting\\FeatureGuidedElasticaADMMNet\\analysis\\version_freeze_20260917\\pytest.log",
+    "log_sha256": "6750027b36febdc48fcacb161df1f31dfffa879bfb5bd13bf1aa343fe83fda36"
+  },
+  "server": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python -B -m pytest -q -p no:cacheprovider tests/test_ssim_precision.py",
+    "environment": "/1992910028/envs/inpainting-metax",
+    "passed": 2,
+    "skipped": 0,
+    "seconds": 33.34,
+    "log_path": "D:\\code\\inpainting\\FeatureGuidedElasticaADMMNet\\analysis\\version_freeze_20260917\\pytest_server_ssim.log",
+    "log_sha256": "d1a9a6d33b6a23170eba176f33180c95d9619b5ef7994194dc24cb4e8f52536a",
+    "scope": "SSIM CPU/GPU numerical precision and backend-flag restoration; not a full server suite."
+  },
+  "exp007_008_implemented": false,
+  "new_training_launched": false,
+  "quality_improvement_claimed": false,
+  "github_push_performed": false
+}

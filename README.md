@@ -1,5 +1,9 @@
 # Feature-Guided Elastica ADMM Inpainting
 
+源码基线版本：**v1**（2026-09-17）。版本范围、服务器差异、权重索引与后续开发规则见 [v1 冻结说明](docs/releases/v1/README.md)。`codex/v1_1` 用于后续实验 7/8 的开发，建立分支不代表这两项实验已经实施。
+
+服务器 EXP-006 的冻结匹配配置位于 `configs/metax_ablation_20260915/`；这些文件保留历史路径和输出名，新实验应使用独立配置及输出目录。下文 `configs/structure_v1_*.yaml` 是原有运行配置，二者训练协议不同。
+
 当前 Stage 1 的 **Learned Structure Prior V1** 已接入：从现有多尺度语义特征预测带符号 RGB 梯度和 edge，在 p 子问题中加入显式二次结构项，最后用同一 u 方程的 PCG readout 得到粗修复图。
 
 使用前请读 [V1 公式、训练配置及诊断说明](docs/structure_prior_v1.md)。三组匹配对照为 `configs/structure_v1_r0.yaml`、`structure_v1_r1.yaml`、`structure_v1_r2.yaml`；下面的 MVP/full 配置不是这三组对照。

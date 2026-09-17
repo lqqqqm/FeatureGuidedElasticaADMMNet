@@ -1,0 +1,79 @@
+{
+  "version": "v1",
+  "audit_created_utc": "2026-09-17T07:55:58.555252+00:00",
+  "host": "ai.qdu.edu.cn",
+  "port": 30207,
+  "note": "Historical checkpoints indexed for the v1 baseline, not newly trained artifacts of this tag. Weights remain on the server; Git records locations, hashes and configs only. This is not a backup of weight contents.",
+  "historical_configs": [
+    {
+      "server_path": "/1992910028/inpainting/FeatureGuidedElasticaADMMNet/outputs/metax_structure_v1/r2_continue_e41_60_fp32_b16/config_resolved.yaml",
+      "release_relative_path": "configs/historical_r2_e41_60.yaml",
+      "sha256": "c601dacd55c303f9bb2355d6b59c120e3acf764910b258dec3e6a2c7cb318cbe"
+    },
+    {
+      "archived_source": "D:\\code\\inpainting\\experiment-ledger\\snapshots\\2026-09-15\\EXP-001-r2-e01-40\\runner_config.yaml",
+      "release_relative_path": "configs/historical_r2_e1_40.yaml",
+      "sha256": "d072932b0903e1e1a8219ecb6226565fb01786b985f328828c2642df9c64a6b7",
+      "note": "Existing 2026-09-15 ledger snapshot of the historical runner config; retains original Windows data/output paths. Not freshly recovered config_resolved.yaml (absent from outputs/outputs)."
+    }
+  ],
+  "exp006_protocol": "exp006_protocol.json",
+  "checkpoints": [
+    {
+      "experiment": "EXP-004",
+      "variant": "R2",
+      "epoch": 58,
+      "role": "historical hole-PSNR selection",
+      "server_path": "/1992910028/inpainting/FeatureGuidedElasticaADMMNet/outputs/metax_structure_v1/r2_continue_e41_60_fp32_b16/best.pt",
+      "sha256": "88668d33ff9170652e0f91a8df5572dc1cf712f09f2c3873a5f83fb3830fb10d",
+      "size": 225020516,
+      "mtime_ns": 1789436438362361471,
+      "config_relative_to_this_file": "configs/historical_r2_e41_60.yaml",
+      "config_sha256": "c601dacd55c303f9bb2355d6b59c120e3acf764910b258dec3e6a2c7cb318cbe",
+      "epoch_source": "Existing experiment-ledger audit / completion reports; weights hashed read-only during this freeze.",
+      "trained_from_v1_tag": false
+    },
+    {
+      "experiment": "EXP-004",
+      "variant": "R2",
+      "epoch": 60,
+      "role": "last epoch",
+      "server_path": "/1992910028/inpainting/FeatureGuidedElasticaADMMNet/outputs/metax_structure_v1/r2_continue_e41_60_fp32_b16/latest.pt",
+      "sha256": "ab02df06c4823019139118ee8517c956460095969565c05cfacd3f1fa1a9fe4d",
+      "size": 225047904,
+      "mtime_ns": 1789444732102218729,
+      "config_relative_to_this_file": "configs/historical_r2_e41_60.yaml",
+      "config_sha256": "c601dacd55c303f9bb2355d6b59c120e3acf764910b258dec3e6a2c7cb318cbe",
+      "epoch_source": "Existing experiment-ledger audit / completion reports; weights hashed read-only during this freeze.",
+      "trained_from_v1_tag": false
+    },
+    {
+      "experiment": "EXP-006",
+      "variant": "R0",
+      "epoch": 39,
+      "role": "matched run hole-PSNR selection",
+      "server_path": "/1992910028/inpainting/FeatureGuidedElasticaADMMNet/outputs/ablation_20260915/runs/exp006_r0_s42_fp32_b16/best.pt",
+      "sha256": "ef85112a47303b4ecfe9ef7d58e36d3505b5f955f504e5940ee4a20ea284a94b",
+      "size": 222212828,
+      "mtime_ns": 1789614950666731334,
+      "config_relative_to_this_file": "../../../configs/metax_ablation_20260915/r0.yaml",
+      "config_sha256": "d7dc156faebe8bb87d5adf6924d9e521fd337e5da1aad32ce9118e1a53227458",
+      "epoch_source": "Existing experiment-ledger audit / completion reports; weights hashed read-only during this freeze.",
+      "trained_from_v1_tag": false
+    },
+    {
+      "experiment": "EXP-001",
+      "variant": "R2",
+      "epoch": 39,
+      "role": "historical structure selection",
+      "server_path": "/1992910028/inpainting/FeatureGuidedElasticaADMMNet/outputs/outputs/best_structure.pt",
+      "sha256": "0702db72ecedfb4473e28df2b83110168948bc5ff225e5b875d48185efa240bc",
+      "size": 225058667,
+      "mtime_ns": 1789118865976898814,
+      "config_relative_to_this_file": "configs/historical_r2_e1_40.yaml",
+      "config_sha256": "d072932b0903e1e1a8219ecb6226565fb01786b985f328828c2642df9c64a6b7",
+      "epoch_source": "Existing experiment-ledger audit / completion reports; weights hashed read-only during this freeze.",
+      "trained_from_v1_tag": false
+    }
+  ]
+}

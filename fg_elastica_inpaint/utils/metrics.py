@@ -216,7 +216,26 @@ def _gaussian_kernel(window_size: int = 11, sigma: float = 1.5, channels: int = 
 
 
 def ssim_map(pred: torch.Tensor, gt: torch.Tensor, window_size: int = 11, sigma: float = 1.5) -> torch.Tensor:
-    """Return the usual local SSIM map, before any region averaging."""
+    """Score local moments without autocast or reduced-precision convolution.
+
+    Variance subtraction amplifies TF32 rounding on the MetaX backend. Limit
+    the precision guard to SSIM and restore the caller's convolution setting,
+    including when scoring raises. Preserve FP64 reference inputs.
+    """
+    dtype = torch.float64 if torch.float64 in (pred.dtype, gt.dtype) else torch.float32
+    previous_tf32 = torch.backends.cudnn.allow_tf32
+    try:
+        if pred.is_cuda:
+            torch.backends.cudnn.allow_tf32 = False
+        with torch.autocast(device_type=pred.device.type, enabled=False):
+            return _ssim_map_moments(pred.to(dtype), gt.to(dtype), window_size, sigma)
+    finally:
+        if pred.is_cuda:
+            torch.backends.cudnn.allow_tf32 = previous_tf32
+
+
+def _ssim_map_moments(pred: torch.Tensor, gt: torch.Tensor, window_size: int, sigma: float) -> torch.Tensor:
+    """Compute the original SSIM formula in the caller-selected full precision."""
     c1 = (0.01 * 2.0) ** 2
     c2 = (0.03 * 2.0) ** 2
     channels = pred.shape[1]

@@ -284,7 +284,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True)
     parser.add_argument("--resume", type=str, default=None)
+    parser.add_argument("--reset-scheduler", action="store_true",
+                        help="Keep resumed weights and Adam state, but start a new configured LR schedule")
     args = parser.parse_args()
+    if args.reset_scheduler and not args.resume:
+        parser.error("--reset-scheduler requires --resume")
 
     cfg = load_config(args.config)
     set_seed(int(cfg.get("seed", 42)))
@@ -328,7 +332,11 @@ def main():
         betas=tuple(optim_cfg.get("betas", [0.9, 0.999])),
         weight_decay=optim_cfg.get("weight_decay", 1e-4),
     )
-    total_steps = optim_cfg.get("epochs", 100) * max(len(train_loader), 1)
+    schedule_start_epoch = int(optim_cfg.get("schedule_start_epoch", 0))
+    schedule_epochs = int(optim_cfg.get("epochs", 100)) - schedule_start_epoch
+    if schedule_start_epoch < 0 or schedule_epochs <= 0:
+        raise ValueError("Schedule must span at least one epoch after optim.schedule_start_epoch")
+    total_steps = schedule_epochs * max(len(train_loader), 1)
     scheduler = build_warmup_cosine_scheduler(
         optimizer,
         warmup_steps=optim_cfg.get("warmup_steps", 0),
@@ -342,7 +350,21 @@ def main():
         ckpt = torch.load(args.resume, map_location=device)
         model.load_state_dict(ckpt["model"])
         optimizer.load_state_dict(ckpt["optimizer"])
-        scheduler.load_state_dict(ckpt["scheduler"])
+        if args.reset_scheduler:
+            if schedule_start_epoch != int(ckpt["epoch"]):
+                raise ValueError("Reset schedule requires optim.schedule_start_epoch == checkpoint epoch")
+            for group in optimizer.param_groups:
+                group["lr"] = group["initial_lr"] = float(optim_cfg["lr"])
+            scheduler = build_warmup_cosine_scheduler(
+                optimizer, warmup_steps=optim_cfg.get("warmup_steps", 0),
+                total_steps=total_steps, min_ratio=optim_cfg.get("min_lr_ratio", 0.05))
+            print(f"[Continuation] Preserved Adam state; reset LR schedule for {total_steps} updates, "
+                  f"starting lr={optimizer.param_groups[0]['lr']:.6e}")
+        else:
+            saved_start = int(ckpt.get("config", {}).get("optim", {}).get("schedule_start_epoch", 0))
+            if schedule_start_epoch != saved_start:
+                raise ValueError("Schedule origin changed; use --reset-scheduler explicitly")
+            scheduler.load_state_dict(ckpt["scheduler"])
         scaler.load_state_dict(ckpt["scaler"])
         start_epoch = ckpt["epoch"] + 1
         monitor_state = ckpt.get("monitor")

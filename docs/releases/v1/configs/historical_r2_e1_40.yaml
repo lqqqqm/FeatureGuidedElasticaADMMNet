@@ -1,0 +1,135 @@
+data:
+  batch_size: 4
+  bucket_probs:
+  - 0.15
+  - 0.15
+  - 0.3
+  - 0.4
+  eval_mask_seed: 1701
+  hole_buckets:
+  - - 0.1
+    - 0.2
+  - - 0.2
+    - 0.3
+  - - 0.3
+    - 0.45
+  - - 0.45
+    - 0.6
+  image_size: 256
+  mask_topology_modes:
+  - thin_distributed
+  - scattered_irregular
+  - large_contiguous
+  - mixed
+  mask_topology_probs:
+  - 0.15
+  - 0.2
+  - 0.5
+  - 0.15
+  num_workers: 4
+  resize_short_to: 286
+  test_batch_size: 4
+  test_limit: null
+  test_list: C:\dataset\archive\celeba_hq_256_lists\test.txt
+  test_mask_list: null
+  test_mask_seed: 2701
+  train_limit: null
+  train_list: C:\dataset\archive\celeba_hq_256_lists\train.txt
+  val_batch_size: 4
+  val_limit: null
+  val_list: C:\dataset\archive\celeba_hq_256_lists\val.txt
+  val_mask_list: null
+diagnostics:
+  fixed_samples: 16
+  raw_every: 5
+eval:
+  compute_fid: false
+  compute_lpips: true
+  fid_during_train: false
+  max_batches: null
+loss:
+  edge_hole_only: true
+  edge_scale: 0.1
+  hole_weight: 6.0
+  lambda_edge: 1.0
+  lambda_n_m: 0.0
+  lambda_p_cons: 0.0
+  lambda_perc: 0.0
+  lambda_rec: 1.0
+  lambda_stage: 0.5
+  lambda_struct: 0.0
+  lambda_structure_consistency: 0.05
+  lambda_structure_edge: 0.2
+  lambda_structure_grad: 1.0
+  lambda_structure_orientation: 0.1
+  orientation_threshold: 0.05
+  stage_weights:
+  - 0.1
+  - 0.2
+  - 0.3
+  structure_known_weight: 0.1
+  structure_scale_weights:
+  - 1.0
+  - 0.5
+  - 0.25
+  use_perceptual: false
+  vgg_pretrained: false
+model:
+  K: 3
+  alpha_n_init: 0.0
+  alpha_n_scale: 0.05
+  alpha_p_init: 0.0
+  alpha_p_scale: 0.05
+  alpha_u_init: 0.1
+  alpha_u_scale: 0.1
+  enable_n_correction: false
+  enable_p_correction: false
+  enable_u_correction: true
+  readout_backward_iterations: 640
+  readout_iterations: 512
+  readout_tolerance: 1.0e-07
+  transformer_depth: 2
+  transformer_dropout: 0.0
+  transformer_heads: 8
+  transformer_mlp_ratio: 4.0
+  use_bounded_alpha: true
+  use_pcg_readout: true
+  use_softplus_alpha: true
+  use_structure_prior: true
+  structure_rho: 16.0
+monitor:
+  metric: hole_psnr
+  min_delta: 0.01
+  mode: max
+  patience: 0
+  warmup_epochs: 5
+optim:
+  amp: true
+  betas:
+  - 0.9
+  - 0.999
+  epochs: 40
+  grad_clip: 1.0
+  lr: 0.0001
+  min_lr_ratio: 0.05
+  save_every: 5
+  warmup_steps: 1000
+  weight_decay: 0.0001
+output_dir: C:\codeee\inpainting\s_inpainting\FeatureGuidedElasticaADMMNet\outputs\structure_v1
+run_name: r2
+seed: 42
+stage_hyper:
+  Tn: 3
+  Tu: 3
+  a: 0.1
+  b: 0.2
+  eps: 1.0e-06
+  eta: 10.0
+  r1: 1.0
+  r2: 2.0
+  r4: 1.0
+  tau_n: 0.125
+  tau_u: 0.05
+structure_training:
+  ramp_epochs: 3
+  warmup_epochs: 2
